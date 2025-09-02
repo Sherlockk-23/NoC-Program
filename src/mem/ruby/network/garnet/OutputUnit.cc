@@ -97,10 +97,25 @@ OutputUnit::has_credit(int out_vc)
 bool
 OutputUnit::has_free_vc(int vnet)
 {
+    // In wormhole mode, we need to check if VC has enough buffer space
+    // rather than requiring it to be completely idle
+    bool is_wormhole = false;
+    if (m_router->get_net_ptr() != nullptr) {
+        is_wormhole = m_router->is_wormhole_enabled();
+    }
+
     int vc_base = vnet*m_vc_per_vnet;
     for (int vc = vc_base; vc < vc_base + m_vc_per_vnet; vc++) {
-        if (is_vc_idle(vc, curTick()))
-            return true;
+        if (is_wormhole) {
+            // In wormhole mode, check if VC has enough credits for the new flit
+            if (outVcState[vc].get_credit_count() > 0) {
+                return true;
+            }
+        } else {
+            // Traditional mode - VC must be idle
+            if (is_vc_idle(vc, curTick()))
+                return true;
+        }
     }
 
     return false;
@@ -123,14 +138,13 @@ OutputUnit::has_free_vc_ring(int vnet, int vc_layer, int vc_offset)
 // [CHECK THIS]
 
 int
-OutputUnit::select_free_vc_ring(int vnet, int vc_layer, int vc_offset, bool set_active)
+OutputUnit::select_free_vc_ring(int vnet, int vc_layer, int vc_offset)
 {
     int vc_base = vnet*m_vc_per_vnet;
     for (int vc = vc_base + vc_layer;
         vc < vc_base + m_vc_per_vnet; vc += vc_offset) {
         if (is_vc_idle(vc, curTick())) {
-            if (set_active)
-                outVcState[vc].setState(ACTIVE_, curTick());
+            outVcState[vc].setState(ACTIVE_, curTick());
             return vc;
         }
     }
@@ -138,15 +152,30 @@ OutputUnit::select_free_vc_ring(int vnet, int vc_layer, int vc_offset, bool set_
     return -1;
 }
 
+
 int
 OutputUnit::select_free_vc(int vnet)
 {
+    bool is_wormhole = false;
+    if (m_router->get_net_ptr() != nullptr) {
+        is_wormhole = m_router->is_wormhole_enabled();
+    }
     int vc_base = vnet*m_vc_per_vnet;
+
     for (int vc = vc_base; vc < vc_base + m_vc_per_vnet; vc++) {
-        // Traditional mode - VC must be idle
-        if (is_vc_idle(vc, curTick())) {
-            outVcState[vc].setState(ACTIVE_, curTick());
-            return vc;
+        if (is_wormhole) {
+            // In wormhole mode, select VC with available credits
+            if (outVcState[vc].get_credit_count() > 0) {
+                // Don't change state to ACTIVE here in wormhole mode
+                // The VC can handle multiple packets simultaneously
+                return vc;
+            }
+        } else {
+            // Traditional mode - VC must be idle
+            if (is_vc_idle(vc, curTick())) {
+                outVcState[vc].setState(ACTIVE_, curTick());
+                return vc;
+            }
         }
     }
 

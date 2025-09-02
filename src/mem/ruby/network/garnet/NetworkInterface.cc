@@ -1,6 +1,3 @@
-// TODO: 注入的时候怎么看 outport 和 VC ？？？
-
-
 /*
  * Copyright (c) 2020 Advanced Micro Devices, Inc.
  * Copyright (c) 2020 Inria
@@ -245,6 +242,20 @@ NetworkInterface::wakeup()
             // credits.
             if (t_flit->get_type() == TAIL_ ||
                 t_flit->get_type() == HEAD_TAIL_) {
+                DPRINTF(RubyNetwork, "is HEAD_TAIL_\n");
+                DPRINTF(RubyNetwork, "iPort->messageEnqueuedThisCycle %d\n", iPort->messageEnqueuedThisCycle);
+
+                // Check if outNode_ptr[vnet] is valid before dereferencing
+                if (vnet >= outNode_ptr.size() || outNode_ptr[vnet] == nullptr) {
+                    DPRINTF(RubyNetwork, "outNode_ptr[%d] is null or out of bounds (size: %d)\n",
+                            vnet, outNode_ptr.size());
+                    // Send back a credit since we can't process this flit
+                    Credit *cFlit = new Credit(t_flit->get_vc(), false, curTick());
+                    iPort->sendCredit(cFlit);
+                    delete t_flit;
+                    continue;
+                }
+
                 if (!iPort->messageEnqueuedThisCycle &&
                     outNode_ptr[vnet]->areNSlotsAvailable(1, curTime)) {
                     // Space is available. Enqueue to protocol buffer.
@@ -334,8 +345,8 @@ NetworkInterface::checkStallQueue()
 
                 // If we can now eject to the protocol buffer,
                 // send back credits
-                if (outNode_ptr[vnet]->areNSlotsAvailable(1,
-                    curTime)) {
+                if (vnet < outNode_ptr.size() && outNode_ptr[vnet] != nullptr &&
+                    outNode_ptr[vnet]->areNSlotsAvailable(1, curTime)) {
                     outNode_ptr[vnet]->enqueue(stallFlit->get_msg_ptr(),
                         curTime, cyclesToTicks(Cycles(1)));
 
@@ -456,28 +467,51 @@ NetworkInterface::flitisizeMessage(MsgPtr msg_ptr, int vnet)
         }
 
         m_ni_out_vcs_enqueue_time[vc] = curTick();
-        outVcState[vc].setState(ACTIVE_, curTick());
+        // In wormhole mode, don't always set VC to ACTIVE since multiple packets can share
+        bool is_wormhole = (m_net_ptr->depthWormhole() > 1);
+        if (!is_wormhole) {
+            outVcState[vc].setState(ACTIVE_, curTick());
+        } else {
+            // In wormhole mode, only set to ACTIVE if currently IDLE
+            if (outVcState[vc].isInState(IDLE_, curTick())) {
+                outVcState[vc].setState(ACTIVE_, curTick());
+            }
+        }
     }
     return true ;
 }
 
 // Looking for a free output vc
+// [CHECK_THIS] ?
 int
 NetworkInterface::calculateVC(int vnet)
 {
+    // Check if wormhole mode is enabled
+    bool is_wormhole = (m_net_ptr->depthWormhole() > 1);
+
     for (int i = 0; i < m_vc_per_vnet; i++) {
         int delta = m_vc_allocator[vnet];
         m_vc_allocator[vnet]++;
         if (m_vc_allocator[vnet] == m_vc_per_vnet)
             m_vc_allocator[vnet] = 0;
 
-        if (outVcState[(vnet*m_vc_per_vnet) + delta].isInState(
-                    IDLE_, curTick())) {
-            vc_busy_counter[vnet] = 0;
-            DPRINTF(RubyNetwork, "Found free VC: %d for vnet: %d\n", ((vnet*m_vc_per_vnet) + delta), vnet);
-            // DPRINTF(RubyNetwork, "m_deadlock_threshold: %d\n", m_deadlock_threshold);
-            // 确实是 0 ，确实每次都能找到。。。？
-            return ((vnet*m_vc_per_vnet) + delta);
+        int vc_id = (vnet*m_vc_per_vnet) + delta;
+
+        if (is_wormhole) {
+            // In wormhole mode, VC can be reused as long as it has buffer space
+            // Check if VC has available buffer space (credits)
+            if (outVcState[vc_id].has_credit()) {
+                vc_busy_counter[vnet] = 0;
+                // Don't change VC state to ACTIVE here in wormhole mode
+                // Multiple packets can share the same VC
+                return vc_id;
+            }
+        } else {
+            // Traditional mode - VC must be completely idle
+            if (outVcState[vc_id].isInState(IDLE_, curTick())) {
+                vc_busy_counter[vnet] = 0;
+                return vc_id;
+            }
         }
     }
 

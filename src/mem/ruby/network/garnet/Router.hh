@@ -96,6 +96,7 @@ class Router : public BasicRouter, public Consumer
     }
 
     GarnetNetwork* get_net_ptr()                    { return m_network_ptr; }
+    bool is_wormhole_enabled() { return m_network_ptr->depthWormhole() > 1; }
 
     InputUnit*
     getInputUnit(unsigned port)

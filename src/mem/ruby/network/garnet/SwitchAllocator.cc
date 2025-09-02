@@ -123,7 +123,18 @@ SwitchAllocator::arbitrate_inports()
             if (input_unit->need_stage(invc, SA_, curTick())) {
                 // This flit is in SA stage
 
-                int outport = input_unit->get_outport(invc);
+                int outport;
+                // In wormhole mode, get outport from flit; in traditional mode, from VC
+                bool is_wormhole = false;
+                if (m_router->get_net_ptr() != nullptr) {
+                    is_wormhole = m_router->is_wormhole_enabled();
+                }
+                if (is_wormhole) {
+                    flit *t_flit = input_unit->peekTopFlit(invc);
+                    outport = t_flit->get_outport();
+                } else {
+                    outport = input_unit->get_outport(invc);
+                }
 
                 // 最好在这之前决定 outvc, 即在 Input Unit 计算 outport 的时候一起算了
                 // 不然这里一定是 -1 ?
@@ -179,7 +190,7 @@ SwitchAllocator::arbitrate_outports()
     // Again do round robin arbitration on these requests
     // Independent arbiter at each output port
 
-    
+
     for (int outport = 0; outport < m_num_outports; outport++) {
         int inport = m_round_robin_inport[outport];
 
@@ -240,15 +251,33 @@ SwitchAllocator::arbitrate_outports()
 
                 if ((t_flit->get_type() == TAIL_) ||
                     t_flit->get_type() == HEAD_TAIL_) {
-                    // Traditional mode - This Input VC should now be empty
-                    assert(!(input_unit->isReady(invc, curTick())));
 
-                    // Free this VC
-                    input_unit->set_vc_idle(invc, curTick());
+                    bool is_wormhole = false;
+                    if (m_router->get_net_ptr() != nullptr) {
+                        is_wormhole = m_router->is_wormhole_enabled();
+                    }
 
-                    // Send a credit back
-                    // along with the information that this VC is now idle
-                    input_unit->increment_credit(invc, true, curTick());
+                    if (is_wormhole) {
+                        // In wormhole mode, only free VC if buffer is completely empty
+                        if (!(input_unit->isReady(invc, curTick()))) {
+                            // Buffer is empty, can free VC
+                            input_unit->set_vc_idle(invc, curTick());
+                            input_unit->increment_credit(invc, true, curTick());
+                        } else {
+                            // Buffer still has flits, keep VC active
+                            input_unit->increment_credit(invc, false, curTick());
+                        }
+                    } else {
+                        // Traditional mode - This Input VC should now be empty
+                        assert(!(input_unit->isReady(invc, curTick())));
+
+                        // Free this VC
+                        input_unit->set_vc_idle(invc, curTick());
+
+                        // Send a credit back
+                        // along with the information that this VC is now idle
+                        input_unit->increment_credit(invc, true, curTick());
+                    }
                 } else {
                     // Send a credit back
                     // but do not indicate that the VC is idle
@@ -416,10 +445,24 @@ SwitchAllocator::send_allowed(int inport, int invc, int outport, int outvc)
         int vc_base = vnet*m_vc_per_vnet;
         for (int vc_offset = 0; vc_offset < m_vc_per_vnet; vc_offset++) {
             int temp_vc = vc_base + vc_offset;
-            if (input_unit->need_stage(temp_vc, SA_, curTick()) &&
-               (input_unit->get_outport(temp_vc) == outport) &&
-               (input_unit->get_enqueue_time(temp_vc) < t_enqueue_time)) {
-                return false;
+            if (input_unit->need_stage(temp_vc, SA_, curTick())) {
+                int temp_outport;
+                // In wormhole mode, get outport from flit; in traditional mode, from VC
+                bool is_wormhole = false;
+                if (m_router->get_net_ptr() != nullptr) {
+                    is_wormhole = m_router->is_wormhole_enabled();
+                }
+                if (is_wormhole) {
+                    flit *temp_flit = input_unit->peekTopFlit(temp_vc);
+                    temp_outport = temp_flit->get_outport();
+                } else {
+                    temp_outport = input_unit->get_outport(temp_vc);
+                }
+
+                if ((temp_outport == outport) &&
+                   (input_unit->get_enqueue_time(temp_vc) < t_enqueue_time)) {
+                    return false;
+                }
             }
         }
     }
@@ -448,10 +491,7 @@ SwitchAllocator::vc_allocate(int outport, int inport, int invc)
         (RoutingAlgorithm) m_router->get_net_ptr()->getRoutingAlgorithm();
 
     if (routing_algorithm == RING_) {
-        int vcAllocateRing =  vc_allocate_ring(outport, inport, invc);
-        DPRINTF(RubyNetwork, "VC allocated (RING) for outport: %d, inport: %d, invc: %d: %d\n",
-                outport, inport, invc, vcAllocateRing);
-        return vcAllocateRing;
+        return vc_allocate_ring(outport, inport, invc);
     }
 
     // Standard VC allocation for other topologies
@@ -462,8 +502,15 @@ SwitchAllocator::vc_allocate(int outport, int inport, int invc)
     // [CHECK_THIS]  only original grant_outvc, hence can be calculate upward
     assert(outvc != -1);
 
-    m_router->getInputUnit(inport)->grant_outvc(invc, outvc);
-    
+    // In traditional mode, bind the input VC to output VC
+    // In wormhole mode, this binding is per-flit, not per-VC
+    bool is_wormhole = false;
+    if (m_router->get_net_ptr() != nullptr) {
+        is_wormhole = m_router->is_wormhole_enabled();
+    }
+    if (!is_wormhole) {
+        m_router->getInputUnit(inport)->grant_outvc(invc, outvc);
+    }
 
     return outvc;
 }
@@ -483,10 +530,8 @@ SwitchAllocator::vc_allocate_ring(int outport, int inport, int invc)
     int vc_layer = (invc&1)|needs_vc_layer_transition_ring(inport, invc, outport, m_router, m_vc_per_vnet); // should also work ?
     int vc_offset = 2;
     // Select VC from appropriate layer
-    int outvc =
-        m_router->getOutputUnit(outport)->select_free_vc_ring(vnet, vc_layer, vc_offset, true);
+    int outvc = m_router->getOutputUnit(outport)->select_free_vc_ring(vnet, vc_layer, vc_offset);
 
-    // [DEBUG] 先不用这个
     assert(outvc != -1);
 
     m_router->getInputUnit(inport)->grant_outvc(invc, outvc);

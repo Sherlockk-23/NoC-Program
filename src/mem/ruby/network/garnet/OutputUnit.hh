@@ -69,7 +69,7 @@ class OutputUnit : public Consumer
     bool has_credit(int out_vc);
     bool has_free_vc(int vnet);
     bool has_free_vc_ring(int vnet, int vc_layer, int vc_offset);
-    int select_free_vc_ring(int vnet, int vc_layer, int vc_offset, bool set_active=true);
+    int select_free_vc_ring(int vnet, int vc_layer, int vc_offset);
 
 
     int select_free_vc(int vnet);

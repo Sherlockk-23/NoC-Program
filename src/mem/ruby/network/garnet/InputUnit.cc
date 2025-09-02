@@ -92,19 +92,55 @@ InputUnit::wakeup()
         if ((t_flit->get_type() == HEAD_) ||
             (t_flit->get_type() == HEAD_TAIL_)) {
 
-            assert(virtualChannels[vc].get_state() == IDLE_);
-            set_vc_active(vc, curTick());
+            // For wormhole flow control, allow multiple packets to share a VC
+            bool is_wormhole = false;
+            if (m_router->get_net_ptr() != nullptr) {
+                is_wormhole = m_router->is_wormhole_enabled();
+            }
+            if (!is_wormhole) {
+                // Traditional VC flow control - VC must be idle for new packets
+                assert(virtualChannels[vc].get_state() == IDLE_);
+                set_vc_active(vc, curTick());
+            } else {
+                // Wormhole flow control - VC can accept new packets as long as it has buffer space
+                // The VC state management is different in wormhole mode
+                if (virtualChannels[vc].get_state() == IDLE_) {
+                    set_vc_active(vc, curTick());
+                }
+                // If VC is already ACTIVE, we still accept the packet (buffer permitting)
+            }
 
-            // Route computation for this vc
+            // Route computation for this flit
             int outport = m_router->route_compute(t_flit->get_route(),
                 m_id, m_direction);
 
-            // Update output port in VC
-            // All flits in this packet will use this output port
-            // The output port field in the flit is updated after it wins SA
-            grant_outport(vc, outport);
+            // In wormhole mode, each flit stores its own outport
+            // In traditional VC mode, all flits in a packet use the same outport
+            if (is_wormhole) {
+                // Store outport directly in the flit for wormhole mode
+                t_flit->set_outport(outport);
+            } else {
+                // Update output port in VC for traditional mode
+                // All flits in this packet will use this output port
+                grant_outport(vc, outport);
+            }
+
+            // [CHECK THIS]
+            // int outvc = m_router->vc_compute(t_flit->get_route(),
+            //                     m_id, m_direction);
+            // grant_outvc(vc, outvc);
 
         } else {
+            // For BODY/TAIL flits in wormhole mode, also compute route per-flit
+            bool is_wormhole = false;
+            if (m_router->get_net_ptr() != nullptr) {
+                is_wormhole = m_router->is_wormhole_enabled();
+            }
+            if (is_wormhole) {
+                int outport = m_router->route_compute(t_flit->get_route(),
+                    m_id, m_direction);
+                t_flit->set_outport(outport);
+            }
             assert(virtualChannels[vc].get_state() == ACTIVE_);
         }
 
