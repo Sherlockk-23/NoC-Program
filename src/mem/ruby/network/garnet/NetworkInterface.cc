@@ -408,6 +408,7 @@ NetworkInterface::flitisizeMessage(MsgPtr msg_ptr, int vnet)
         int vc = calculateVC(vnet);
 
         if (vc == -1) {
+            DPRINTF(RubyNetwork, "No free VC available for vnet: %d, lasting %d cycles\n", vnet, vc_busy_counter[vnet]);
             return false ;
         }
         MsgPtr new_msg_ptr = msg_ptr->clone();
@@ -487,13 +488,21 @@ int
 NetworkInterface::calculateVC(int vnet)
 {
     // Check if wormhole mode is enabled
+    RoutingAlgorithm routing_algorithm =
+        (RoutingAlgorithm) m_net_ptr->getRoutingAlgorithm();
+    bool is_ring = (routing_algorithm == RING_);
     bool is_wormhole = (m_net_ptr->depthWormhole() > 1);
+
+    assert(!(is_ring && is_wormhole));
 
     for (int i = 0; i < m_vc_per_vnet; i++) {
         int delta = m_vc_allocator[vnet];
         m_vc_allocator[vnet]++;
         if (m_vc_allocator[vnet] == m_vc_per_vnet)
             m_vc_allocator[vnet] = 0;
+
+        if ((delta&1)&&is_ring)
+            continue;
 
         int vc_id = (vnet*m_vc_per_vnet) + delta;
 
@@ -517,8 +526,8 @@ NetworkInterface::calculateVC(int vnet)
 
     vc_busy_counter[vnet] += 1;
     panic_if(vc_busy_counter[vnet] > m_deadlock_threshold,
-        "%s: Possible network deadlock in vnet: %d at time: %llu \n",
-        name(), vnet, curTick());
+        "%s: Possible network deadlock in vnet: %d at time: %llu, router: %d\n",
+        name(), vnet, curTick(), m_id);
 
     return -1;
 }
