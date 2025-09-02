@@ -66,6 +66,12 @@ class SwitchAllocator : public Consumer
     bool send_allowed(int inport, int invc, int outport, int outvc);
     int vc_allocate(int outport, int inport, int invc);
 
+    // Ring topology specific functions for deadlock prevention
+    int vc_allocate_ring(int outport, int inport, int invc);
+    bool send_allowed_ring(int inport, int invc, int outport, int outvc);
+
+    bool needs_vc_layer_transition_ring(int inport, int invc, int outport,
+                                              Router* router, int vc_per_vnet);
     inline double
     get_input_arbiter_activity()
     {

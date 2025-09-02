@@ -59,6 +59,14 @@ OutVcState::OutVcState(int id, GarnetNetwork *network_ptr,
     else
         m_max_credit_count = network_ptr->getBuffersPerCtrlVC();
 
+    // Override buffer depth for wormhole flow control
+    // [CHECK_THIS ]
+    if (network_ptr->depthWormhole()) {
+        // Wormhole mode: use specified buffer depth
+        m_max_credit_count = network_ptr->depthWormhole();
+        // DPRINTF(WORMHOLE, " [DEBUG WORMHOLE] Num of wormhole is %d", m_max_credit_count);
+    }
+
     m_credit_count = m_max_credit_count;
     assert(m_credit_count >= 1);
 }

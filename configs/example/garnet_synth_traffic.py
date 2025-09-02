@@ -117,6 +117,15 @@ parser.add_argument(
                         Set to -1 to inject randomly in all vnets.",
 )
 
+parser.add_argument(
+    "--global-frequency",
+    type=str,
+    default="100ps",
+    help="Set the global frequency for the simulation.\
+                        Default is 1ps, which is suitable for Garnet.",
+)
+
+
 #
 # Add the ruby specific and protocol specific options
 #
@@ -173,7 +182,12 @@ root = Root(full_system=False, system=system)
 root.system.mem_mode = "timing"
 
 # Not much point in this being higher than the L1 latency
-m5.ticks.setGlobalFrequency("1ps")
+global_freq = args.global_frequency
+assert global_freq.endswith("ps") or global_freq.endswith(
+    "Hz"
+), "Global frequency must be specified in picoseconds (ps) or Hertz (Hz)."
+
+m5.ticks.setGlobalFrequency(global_freq)
 
 # instantiate configuration
 m5.instantiate()

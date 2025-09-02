@@ -106,12 +106,44 @@ OutputUnit::has_free_vc(int vnet)
     return false;
 }
 
+bool
+OutputUnit::has_free_vc_ring(int vnet, int vc_layer, int vc_offset)
+{
+    int vc_base = vnet*m_vc_per_vnet;
+    for (int vc = vc_base + vc_layer;
+        vc < vc_base + m_vc_per_vnet; vc += vc_offset) {
+        if (is_vc_idle(vc, curTick()))
+            return true;
+    }
+
+    return false;
+}
+
 // Assign a free output VC to the winner of Switch Allocation
+// [CHECK THIS]
+
+int
+OutputUnit::select_free_vc_ring(int vnet, int vc_layer, int vc_offset, bool set_active)
+{
+    int vc_base = vnet*m_vc_per_vnet;
+    for (int vc = vc_base + vc_layer;
+        vc < vc_base + m_vc_per_vnet; vc += vc_offset) {
+        if (is_vc_idle(vc, curTick())) {
+            if (set_active)
+                outVcState[vc].setState(ACTIVE_, curTick());
+            return vc;
+        }
+    }
+
+    return -1;
+}
+
 int
 OutputUnit::select_free_vc(int vnet)
 {
     int vc_base = vnet*m_vc_per_vnet;
     for (int vc = vc_base; vc < vc_base + m_vc_per_vnet; vc++) {
+        // Traditional mode - VC must be idle
         if (is_vc_idle(vc, curTick())) {
             outVcState[vc].setState(ACTIVE_, curTick());
             return vc;
@@ -145,6 +177,13 @@ OutputUnit::wakeup()
             scheduleEvent(Cycles(1));
         }
     }
+
+    // iterate all packets, and output their infomation
+    // auto outqueue = getOutQueue();
+    // for (auto packet = outBuffer->begin(); packet != outBuffer->end(); packet++) {
+    DPRINTF(RubyNetwork, "Outport in router %d woke up, id %d outputting packet: %s\n",
+            m_router->get_id(), m_id, *getOutQueue());
+    // }
 }
 
 flitBuffer*

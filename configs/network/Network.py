@@ -88,6 +88,14 @@ def define_options(parser):
             inside garnet network.""",
     )
     parser.add_argument(
+        "--wormhole",
+        action="store",
+        type=int,
+        default=1,  # changes here is not working
+        help="""depth of wormhole flow control
+            inside garnet network.""",
+    )
+    parser.add_argument(
         "--routing-algorithm",
         action="store",
         type=int,
@@ -95,7 +103,10 @@ def define_options(parser):
         help="""routing algorithm in network.
             0: weight-based table
             1: XY (for Mesh. see garnet/RoutingUnit.cc)
-            2: Custom (see garnet/RoutingUnit.cc""",
+            2: Ring
+            3: Butterfly
+            4: SlimFly
+            5: Custom (see garnet/RoutingUnit.cc""",
     )
     parser.add_argument(
         "--network-fault-model",
@@ -117,6 +128,14 @@ def define_options(parser):
         default=False,
         help="""SimpleNetwork links uses a separate physical
             channel for each virtual network""",
+    )
+    parser.add_argument(
+        "--slimfly-q",
+        action="store",
+        type=int,
+        default=5,
+        help="""SlimFly topology parameter q (must be prime and (q-1)%%4==0).
+            Determines the size of the SlimFly network.""",
     )
 
 
@@ -168,6 +187,7 @@ def init_network(options, network, InterfaceClass):
         network.vcs_per_vnet = options.vcs_per_vnet
         network.ni_flit_size = options.link_width_bits / 8
         network.routing_algorithm = options.routing_algorithm
+        network.wormhole = options.wormhole
         network.garnet_deadlock_threshold = options.garnet_deadlock_threshold
 
         # Create Bridges and connect them to the corresponding links

@@ -57,6 +57,10 @@ class RoutingUnit
                       int inport,
                       PortDirection inport_dirn);
 
+    int outvcCompute(RouteInfo route,
+                      int inport,
+                      PortDirection inport_dirn);
+
     // Topology-agnostic Routing Table based routing (default)
     void addRoute(std::vector<NetDest>& routing_table_entry);
     void addWeight(int link_weight);
@@ -72,6 +76,21 @@ class RoutingUnit
     int outportComputeXY(RouteInfo route,
                          int inport,
                          PortDirection inport_dirn);
+
+    // Routing for Ring topology (deadlock-free)
+    int outportComputeRing(RouteInfo route,
+                           int inport,
+                           PortDirection inport_dirn);
+
+    // Routing for Butterfly topology
+    int outportComputeButterfly(RouteInfo route,
+                               int inport,
+                               PortDirection inport_dirn);
+
+    // Routing for SlimFly topology
+    int outportComputeSlimFly(RouteInfo route,
+                             int inport,
+                             PortDirection inport_dirn);
 
     // Custom Routing Algorithm using Port Directions
     int outportComputeCustom(RouteInfo route,

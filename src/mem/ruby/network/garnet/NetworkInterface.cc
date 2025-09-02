@@ -1,3 +1,6 @@
+// TODO: 注入的时候怎么看 outport 和 VC ？？？
+
+
 /*
  * Copyright (c) 2020 Advanced Micro Devices, Inc.
  * Copyright (c) 2020 Inria
@@ -41,6 +44,7 @@
 #include "mem/ruby/network/garnet/Credit.hh"
 #include "mem/ruby/network/garnet/flitBuffer.hh"
 #include "mem/ruby/slicc_interface/Message.hh"
+#include "mem/ruby/system/RubySystem.hh"
 
 namespace gem5
 {
@@ -168,6 +172,7 @@ NetworkInterface::incrementStats(flit *t_flit)
     m_net_ptr->increment_flit_queueing_latency(queueing_delay, vnet);
 
     if (t_flit->get_type() == TAIL_ || t_flit->get_type() == HEAD_TAIL_) {
+        DPRINTF(RubyNetwork, "Received packet: %d for vnet: %d\n", t_flit->getPacketID(), vnet);
         m_net_ptr->increment_received_packets(vnet);
         m_net_ptr->increment_packet_network_latency(network_delay, vnet);
         m_net_ptr->increment_packet_queueing_latency(queueing_delay, vnet);
@@ -435,8 +440,9 @@ NetworkInterface::flitisizeMessage(MsgPtr msg_ptr, int vnet)
         route.hops_traversed = -1;
 
         m_net_ptr->increment_injected_packets(vnet);
-        m_net_ptr->update_traffic_distribution(route);
         int packet_id = m_net_ptr->getNextPacketID();
+        DPRINTF(RubyNetwork, "Injected packet: %d for vnet: %d, with number of flits %d\n", packet_id, vnet, num_flits);
+        m_net_ptr->update_traffic_distribution(route);
         for (int i = 0; i < num_flits; i++) {
             m_net_ptr->increment_injected_flits(vnet);
             flit *fl = new flit(packet_id,
@@ -468,6 +474,9 @@ NetworkInterface::calculateVC(int vnet)
         if (outVcState[(vnet*m_vc_per_vnet) + delta].isInState(
                     IDLE_, curTick())) {
             vc_busy_counter[vnet] = 0;
+            DPRINTF(RubyNetwork, "Found free VC: %d for vnet: %d\n", ((vnet*m_vc_per_vnet) + delta), vnet);
+            // DPRINTF(RubyNetwork, "m_deadlock_threshold: %d\n", m_deadlock_threshold);
+            // 确实是 0 ，确实每次都能找到。。。？
             return ((vnet*m_vc_per_vnet) + delta);
         }
     }

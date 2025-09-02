@@ -73,6 +73,8 @@ InputUnit::InputUnit(int id, PortDirection direction, Router *router)
  *
  */
 
+// [DEBUG] state one: VA_ -> SA_, pick outport & outvc
+
 void
 InputUnit::wakeup()
 {
@@ -84,7 +86,7 @@ InputUnit::wakeup()
         m_router->get_id(), m_in_link->name(),
         m_router->getBitWidth(), *t_flit);
         assert(t_flit->m_width == m_router->getBitWidth());
-        int vc = t_flit->get_vc();
+        int vc = t_flit->get_vc();   // decided at last jump ! used here!
         t_flit->increment_hops(); // for stats
 
         if ((t_flit->get_type() == HEAD_) ||
