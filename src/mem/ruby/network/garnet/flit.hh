@@ -82,6 +82,12 @@ class flit
     void increment_hops() { m_route.hops_traversed++; }
     virtual void print(std::ostream& out) const;
 
+    // for val
+    void set_val_med(int med) { m_val_med = med; }
+    int get_val_med(){ return m_val_med; }
+    void set_val_state(int state) { m_val_state = state; }
+    int get_val_state() { return m_val_state;}
+
     bool
     is_stage(flit_stage stage, Tick time)
     {
@@ -129,6 +135,10 @@ class flit
     int m_outport;
     Tick src_delay;
     std::pair<flit_stage, Tick> m_stage;
+
+    // for val
+    int m_val_med;
+    int m_val_state;
 };
 
 inline std::ostream&

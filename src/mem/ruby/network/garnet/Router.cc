@@ -34,6 +34,7 @@
 
 #include "debug/RubyNetwork.hh"
 #include "mem/ruby/network/garnet/CreditLink.hh"
+#include "mem/ruby/network/garnet/flit.hh"
 #include "mem/ruby/network/garnet/GarnetNetwork.hh"
 #include "mem/ruby/network/garnet/InputUnit.hh"
 #include "mem/ruby/network/garnet/NetworkLink.hh"
@@ -169,9 +170,9 @@ Router::getInportDirection(int inport)
 }
 
 int
-Router::route_compute(RouteInfo route, int inport, PortDirection inport_dirn)
+Router::route_compute(RouteInfo route, int inport, PortDirection inport_dirn, flit *t_flit)
 {
-    return routingUnit.outportCompute(route, inport, inport_dirn);
+    return routingUnit.outportCompute(route, inport, inport_dirn, t_flit);
 }
 
 int

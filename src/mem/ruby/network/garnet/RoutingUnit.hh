@@ -55,7 +55,8 @@ class RoutingUnit
     RoutingUnit(Router *router);
     int outportCompute(RouteInfo route,
                       int inport,
-                      PortDirection inport_dirn);
+                      PortDirection inport_dirn, 
+                      flit *t_flit);
 
     int outvcCompute(RouteInfo route,
                       int inport,
@@ -76,6 +77,11 @@ class RoutingUnit
     int outportComputeXY(RouteInfo route,
                          int inport,
                          PortDirection inport_dirn);
+
+    int outportComputeXY_VAL(RouteInfo route,
+                             int inport,
+                             PortDirection inport_dirn, 
+                              flit *t_flit);
 
     // Routing for Ring topology (deadlock-free)
     int outportComputeRing(RouteInfo route,

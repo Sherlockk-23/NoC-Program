@@ -109,6 +109,13 @@ def define_options(parser):
             5: Custom (see garnet/RoutingUnit.cc""",
     )
     parser.add_argument(
+        "--use-val",
+        action="store",
+        type=bool,
+        default=False,
+        help="""Whether use VAL routing""",
+    )
+    parser.add_argument(
         "--network-fault-model",
         action="store_true",
         default=False,
@@ -189,6 +196,7 @@ def init_network(options, network, InterfaceClass):
         network.routing_algorithm = options.routing_algorithm
         network.wormhole = options.wormhole
         network.garnet_deadlock_threshold = options.garnet_deadlock_threshold
+        network.use_val = options.use_val
 
         # Create Bridges and connect them to the corresponding links
         for intLink in network.int_links:

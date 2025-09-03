@@ -59,6 +59,7 @@ struct RouteInfo
 {
     RouteInfo()
         : vnet(0), src_ni(0), src_router(0), dest_ni(0), dest_router(0),
+        //   med_router(-1), 
           hops_traversed(0)
     {}
 
@@ -69,6 +70,8 @@ struct RouteInfo
     // src and dest format for topology-specific routing
     int src_ni;
     int src_router;
+    // int med_router;
+    // int med_state;
     int dest_ni;
     int dest_router;
     int hops_traversed;

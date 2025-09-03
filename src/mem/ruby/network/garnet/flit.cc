@@ -61,6 +61,9 @@ flit::flit(int packet_id, int id, int  vc, int vnet, RouteInfo route, int size,
     m_width = bWidth;
     msgSize = MsgSize;
 
+    m_val_med = -1;
+    m_val_state = -1;
+
     if (size == 1) {
         m_type = HEAD_TAIL_;
         return;
@@ -120,6 +123,8 @@ flit::print(std::ostream& out) const
     out << "Src Router=" << m_route.src_router << " ";
     out << "Dest NI=" << m_route.dest_ni << " ";
     out << "Dest Router=" << m_route.dest_router << " ";
+    out << "VAL medium router=" << m_val_med << " ";
+    out << "VAL state=" << m_val_state << " ";
     out << "Set Time=" << m_time << " ";
     out << "Width=" << m_width<< " ";
     out << "]";

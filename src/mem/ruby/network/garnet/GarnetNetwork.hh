@@ -81,6 +81,7 @@ class GarnetNetwork : public Network
     uint32_t getBuffersPerCtrlVC() { return m_buffers_per_ctrl_vc; }
     int getRoutingAlgorithm() const { return m_routing_algorithm; }
     int depthWormhole() const { return m_wormhole; }
+    bool getVal() const { return m_use_val; }
 
     bool isFaultModelEnabled() const { return m_enable_fault_model; }
     FaultModel* fault_model;
@@ -168,6 +169,7 @@ class GarnetNetwork : public Network
     uint32_t m_buffers_per_data_vc;
     int m_routing_algorithm;
     int m_wormhole; // [DEBUG]
+    bool m_use_val;
     bool m_enable_fault_model;
 
     // Statistical variables

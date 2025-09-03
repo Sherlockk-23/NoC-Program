@@ -112,7 +112,7 @@ InputUnit::wakeup()
 
             // Route computation for this flit
             int outport = m_router->route_compute(t_flit->get_route(),
-                m_id, m_direction);
+                m_id, m_direction, t_flit);
 
             // In wormhole mode, each flit stores its own outport
             // In traditional VC mode, all flits in a packet use the same outport
@@ -138,7 +138,7 @@ InputUnit::wakeup()
             }
             if (is_wormhole) {
                 int outport = m_router->route_compute(t_flit->get_route(),
-                    m_id, m_direction);
+                    m_id, m_direction, t_flit);
                 t_flit->set_outport(outport);
             }
             assert(virtualChannels[vc].get_state() == ACTIVE_);

@@ -55,6 +55,7 @@ class GarnetNetwork(RubyNetwork):
     garnet_deadlock_threshold = Param.UInt32(
         50000, "network-level deadlock threshold"
     )
+    use_val = Param.Bool("use VAL for routing algorithm")
 
 
 class GarnetNetworkInterface(ClockedObject):
@@ -73,6 +74,10 @@ class GarnetNetworkInterface(ClockedObject):
     garnet_deadlock_threshold = Param.UInt32(
         Parent.garnet_deadlock_threshold, "network-level deadlock threshold"
     )
+    use_val = Param.Bool(
+        Parent.use_val,
+        "use VAL for routing algorithm"
+        )
 
 
 class GarnetRouter(BasicRouter):
@@ -88,4 +93,7 @@ class GarnetRouter(BasicRouter):
     )
     width = Param.UInt32(
         Parent.ni_flit_size, "bit width supported by the router"
+    )
+    use_val = Param.Bool(
+        Parent.use_val, "use VAL for routing algorithm"
     )
