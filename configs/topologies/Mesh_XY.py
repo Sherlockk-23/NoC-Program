@@ -27,6 +27,7 @@
 
 from m5.params import *
 from m5.objects import *
+from m5.util.convert import *
 
 from common import FileSystemConfig
 

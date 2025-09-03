@@ -83,6 +83,23 @@ class GarnetNetwork : public Network
     int depthWormhole() const { return m_wormhole; }
     bool getVal() const { return m_use_val; }
 
+    // // Custom topology information accessors
+    // bool isSpecialNode(int node_id) const;
+    // int getNextHop(int src, int dest) const;
+    // const std::vector<int>& getCustomRoutingInfo() const { return m_custom_routing_info; }
+    // void setTopologyInfo(const std::vector<int>& special_nodes,
+    //                     const std::vector<int>& next_hop_table,
+    //                     const std::vector<int>& custom_info);
+
+    // SlimFly specific accessors
+    int getSlimFlyQ() const { return m_slimfly_q; }
+    bool isInSlimFlyX1(int val) const;
+    bool isInSlimFlyX2(int val) const;
+    int getSlimFlyOutport(int src_router, int dest_router) const;
+    void setSlimFlyInfo(int q, const std::vector<int>& X1_binary, 
+                       const std::vector<int>& X2_binary,
+                       const std::vector<int>& outport_table);
+
     bool isFaultModelEnabled() const { return m_enable_fault_model; }
     FaultModel* fault_model;
 
@@ -218,6 +235,18 @@ class GarnetNetwork : public Network
     std::vector<CreditLink *> m_creditlinks; // All credit links in the network
     std::vector<NetworkInterface *> m_nis;   // All NI's in Network
     int m_next_packet_id; // static vairable for packet id allocation
+    
+    // Custom topology information
+    std::vector<int> m_special_nodes;        // List of special node IDs
+    std::vector<int> m_next_hop_table;       // Flattened next-hop table [src*num_nodes + dest]
+    std::vector<int> m_custom_routing_info;  // Additional custom routing information
+    int m_num_nodes;                         // Total number of nodes for indexing
+    
+    // SlimFly specific information
+    int m_slimfly_q;                         // SlimFly parameter q
+    std::vector<int> m_slimfly_X1;           // X1 set as binary array (0/1 for each 0..q-1)
+    std::vector<int> m_slimfly_X2;           // X2 set as binary array (0/1 for each 0..q-1)
+    std::vector<int> m_slimfly_outport_table; // Outport lookup table [src_router*num_routers + dest_router]
 };
 
 inline std::ostream&

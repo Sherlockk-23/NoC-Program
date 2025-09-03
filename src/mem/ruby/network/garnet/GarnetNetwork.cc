@@ -74,6 +74,18 @@ GarnetNetwork::GarnetNetwork(const Params &p)
     m_wormhole = p.wormhole;
     m_next_packet_id = 0;
 
+    // Initialize custom topology information
+    // m_special_nodes = p.special_nodes;
+    // m_next_hop_table = p.next_hop_table;
+    // m_custom_routing_info = p.custom_routing_info;
+    // m_num_nodes = 0;  // Will be set during topology creation
+    
+    // Initialize SlimFly specific information
+    m_slimfly_q = p.slimfly_q;
+    m_slimfly_X1 = p.slimfly_X1;
+    m_slimfly_X2 = p.slimfly_X2;
+    m_slimfly_outport_table = p.slimfly_outport_table;
+
     // DPRINTF(WORMHOLE, "[DEBUG] m_wormhole %d\n", m_wormhole);
     // DPRINTF(WORMHOLE, "[DEBUG] m_routing_algorithm %d\n", m_routing_algorithm);
 
@@ -155,6 +167,8 @@ GarnetNetwork::init()
             router->printFaultVector(std::cout);
         }
     }
+    DPRINTF(RubyNetwork, "GarnetNetwork::init() complete, with number of routers %d, number of nodes %d \n",
+            m_routers.size(), m_nodes);
 }
 
 /*
@@ -720,6 +734,51 @@ GarnetNetwork::functionalWrite(Packet *pkt)
     }
 
     return num_functional_writes;
+}
+// SlimFly specific methods
+bool
+GarnetNetwork::isInSlimFlyX1(int val) const
+{
+    if (val < 0 || val >= m_slimfly_X1.size()) {
+        return false;
+    }
+    return m_slimfly_X1[val] == 1;
+}
+
+bool
+GarnetNetwork::isInSlimFlyX2(int val) const
+{
+    if (val < 0 || val >= m_slimfly_X2.size()) {
+        return false;
+    }
+    return m_slimfly_X2[val] == 1;
+}
+
+int
+GarnetNetwork::getSlimFlyOutport(int src_router, int dest_router) const
+{
+    if (m_slimfly_outport_table.empty()) {
+        return -1;  // No outport table available
+    }
+    
+    int num_routers = m_routers.size();
+    if (src_router >= num_routers || dest_router >= num_routers || 
+        src_router < 0 || dest_router < 0) {
+        return -1;  // Invalid router IDs
+    }
+    
+    return m_slimfly_outport_table[src_router * num_routers + dest_router];
+}
+
+void
+GarnetNetwork::setSlimFlyInfo(int q, const std::vector<int>& X1_binary, 
+                             const std::vector<int>& X2_binary,
+                             const std::vector<int>& outport_table)
+{
+    m_slimfly_q = q;
+    m_slimfly_X1 = X1_binary;
+    m_slimfly_X2 = X2_binary;
+    m_slimfly_outport_table = outport_table;
 }
 
 } // namespace garnet

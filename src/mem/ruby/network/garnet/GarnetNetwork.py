@@ -56,6 +56,17 @@ class GarnetNetwork(RubyNetwork):
         50000, "network-level deadlock threshold"
     )
     use_val = Param.Bool("use VAL for routing algorithm")
+    
+    # Custom topology information parameters
+    special_nodes = VectorParam.Int([], "List of special node IDs for custom routing")
+    next_hop_table = VectorParam.Int([], "Flattened next-hop table for custom routing")
+    custom_routing_info = VectorParam.Int([], "Additional custom routing information")
+    
+    # SlimFly specific parameters
+    slimfly_q = Param.Int(5, "SlimFly parameter q")
+    slimfly_X1 = VectorParam.Int([], "SlimFly X1 set as binary array")
+    slimfly_X2 = VectorParam.Int([], "SlimFly X2 set as binary array")
+    slimfly_outport_table = VectorParam.Int([], "SlimFly outport lookup table")
 
 
 class GarnetNetworkInterface(ClockedObject):
@@ -93,7 +104,4 @@ class GarnetRouter(BasicRouter):
     )
     width = Param.UInt32(
         Parent.ni_flit_size, "bit width supported by the router"
-    )
-    use_val = Param.Bool(
-        Parent.use_val, "use VAL for routing algorithm"
     )

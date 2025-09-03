@@ -451,7 +451,7 @@ RoutingUnit::outportComputeButterfly(RouteInfo route,
 }
 
 // SlimFly routing algorithm implementation
-// Implements shortest path routing for SlimFly topology
+// Uses precomputed outport lookup table for optimal routing
 // Reference: "Slim Fly: A Cost Effective Low-Diameter Network Topology"
 int
 RoutingUnit::outportComputeSlimFly(RouteInfo route,
@@ -460,136 +460,27 @@ RoutingUnit::outportComputeSlimFly(RouteInfo route,
 {
     int my_id = m_router->get_id();
     int dest_id = route.dest_router;
-    int num_routers = m_router->get_net_ptr()->getNumRouters();
     
-    // Safety check: ensure we have valid output ports
-    if (m_outports_idx2dirn.size() == 0) {
-        DPRINTF(RubyNetwork, "Router %d: No output ports available\n", my_id);
-        return lookupRoutingTable(route.vnet, route.net_dest);
-    }
-    
-    // Extract SlimFly parameters
-    // Assuming q=5 for now (this should be configurable)
-    int q = 5;  // This should be extracted from network configuration
-    
-    // Validate that we have the right number of routers (2*q*q)
-    if (num_routers != 2 * q * q) {
-        DPRINTF(RubyNetwork, "Router %d: Invalid topology size %d, expected %d\n", 
-                my_id, num_routers, 2*q*q);
-        // Fallback to table-based routing if parameters don't match
-        return lookupRoutingTable(route.vnet, route.net_dest);
-    }
-    
-    // Validate router IDs
-    if (my_id < 0 || my_id >= num_routers || dest_id < 0 || dest_id >= num_routers) {
-        DPRINTF(RubyNetwork, "Router %d: Invalid router ID (my_id=%d, dest_id=%d)\n", 
-                my_id, my_id, dest_id);
-        return lookupRoutingTable(route.vnet, route.net_dest);
-    }
-    
-    // Helper function to convert router ID to SlimFly address (i1, i2, i3)
-    auto to_slimfly_addr = [q](int router_id) -> std::tuple<int, int, int> {
-        int i1 = router_id / (q * q);
-        int i2 = (router_id % (q * q)) / q;
-        int i3 = router_id % q;
-        return std::make_tuple(i1, i2, i3);
-    };
-    
-    // Helper function to check if value is in set X (even powers of primitive element)
-    auto is_in_X = [q](int val) -> bool {
-        // For q=5, epsilon=2, X = {1, 4} (even powers: 2^0=1, 2^2=4)
-        if (q == 5) {
-            return (val == 1 || val == 4);
-        }
-        return false;
-    };
-    
-    // Helper function to check if value is in set X_ (odd powers of primitive element)
-    auto is_in_X_ = [q](int val) -> bool {
-        // For q=5, epsilon=2, X_ = {2, 3} (odd powers: 2^1=2, 2^3=3)
-        if (q == 5) {
-            return (val == 2 || val == 3);
-        }
-        return false;
-    };
-    
-    // Convert router IDs to SlimFly addresses
-    auto my_addr = to_slimfly_addr(my_id);
-    int my_i1 = std::get<0>(my_addr);
-    int my_i2 = std::get<1>(my_addr);
-    int my_i3 = std::get<2>(my_addr);
-    
-    auto dest_addr = to_slimfly_addr(dest_id);
-    int dest_i1 = std::get<0>(dest_addr);
-    int dest_i2 = std::get<1>(dest_addr);
-    int dest_i3 = std::get<2>(dest_addr);
-    
-    DPRINTF(RubyNetwork, "Router %d: SlimFly routing from (%d,%d,%d) to (%d,%d,%d)\n",
-            my_id, my_i1, my_i2, my_i3, dest_i1, dest_i2, dest_i3);
-    
-    // Validate SlimFly addresses
-    if (my_i1 < 0 || my_i1 >= 2 || my_i2 < 0 || my_i2 >= q || my_i3 < 0 || my_i3 >= q ||
-        dest_i1 < 0 || dest_i1 >= 2 || dest_i2 < 0 || dest_i2 >= q || dest_i3 < 0 || dest_i3 >= q) {
-        DPRINTF(RubyNetwork, "Router %d: Invalid SlimFly addresses\n", my_id);
-        return lookupRoutingTable(route.vnet, route.net_dest);
-    }
-    
-    // Safety helper function to ensure valid port selection
-    auto safe_port_select = [this](int port_hint, const char* reason) -> int {
-        if (m_outports_idx2dirn.size() == 0) {
-            return 0;
-        }
-        int port = port_hint % m_outports_idx2dirn.size();
-        if (port < 0) port = 0;
-        DPRINTF(RubyNetwork, "Router %d: Selected port %d for %s\n", 
-                m_router->get_id(), port, reason);
-        return port;
-    };
-    
-    // Check if we're at the destination
+    // If destination is current router, route to local port
     if (my_id == dest_id) {
-        DPRINTF(RubyNetwork, "Router %d: Already at destination\n", my_id);
         return lookupRoutingTable(route.vnet, route.net_dest);
     }
     
-    // Implement SlimFly shortest path routing
+    GarnetNetwork* network = m_router->get_net_ptr();
     
-    // Case 1: Same group and same supernode - direct connection possible
-    if (my_i1 == dest_i1 && my_i2 == dest_i2) {
-        int diff = (dest_i3 - my_i3 + q) % q;
-        
-        // Check if direct connection exists
-        bool direct_connection = false;
-        if (my_i1 == 0) {
-            direct_connection = is_in_X(diff) || is_in_X((-diff + q) % q);
-        } else {
-            direct_connection = is_in_X_(diff) || is_in_X_((-diff + q) % q);
-        }
-        
-        if (direct_connection) {
-            int port_selection = abs(dest_i3 - my_i3 + q);
-            return safe_port_select(port_selection, "same supernode direct");
-        } else {
-            DPRINTF(RubyNetwork, "Router %d: No direct connection in supernode\n", my_id);
-            return lookupRoutingTable(route.vnet, route.net_dest);
-        }
+    // Use precomputed outport table for SlimFly routing
+    int target_outport = network->getSlimFlyOutport(my_id, dest_id);
+    
+    if (target_outport >= 0 && target_outport < m_router->get_num_outports()) {
+        DPRINTF(RubyNetwork, "Router %d: SlimFly routing to dest %d via outport %d\n", 
+                my_id, dest_id, target_outport);
+        return target_outport;
+    } else {
+        DPRINTF(RubyNetwork, "Router %d: Invalid outport %d for dest %d, using table fallback\n", 
+                my_id, target_outport, dest_id);
+        // Fallback to table-based routing
+        return lookupRoutingTable(route.vnet, route.net_dest);
     }
-    
-    // Case 2: Different groups - use inter-group connections
-    if (my_i1 != dest_i1) {
-        int inter_group_port = (dest_i1 * q + dest_i2 + dest_i3);
-        return safe_port_select(inter_group_port, "inter-group");
-    }
-    
-    // Case 3: Same group, different supernode - intra-group routing
-    if (my_i1 == dest_i1 && my_i2 != dest_i2) {
-        int intra_group_port = (dest_i2 * q + dest_i3);
-        return safe_port_select(intra_group_port, "intra-group");
-    }
-    
-    // Fallback: use table-based routing
-    DPRINTF(RubyNetwork, "Router %d: Using table-based routing fallback\n", my_id);
-    return lookupRoutingTable(route.vnet, route.net_dest);
 }
 
 // Template for implementing custom routing algorithm
