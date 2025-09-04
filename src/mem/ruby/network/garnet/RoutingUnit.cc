@@ -510,22 +510,28 @@ RoutingUnit::outportComputeSlimFly_VAL(RouteInfo route,
 {
     int dest_id = route.dest_router;
     int my_id = m_router->get_id();
+    int vnet = route.vnet;
+
     if(t_flit->get_val_state()==-1 && my_id==route.src_router){
-        // p can be decided based on congestion metrics
-        int p=rand()&1;
-        DPRINTF(RubyNetwork, "Router %d: VAL decision p=%d, for flit %s\n", my_id, p, *t_flit);
-        if(p){ // do VAL routing
-            int st = route.src_router, ed = route.dest_router;
-            int med = st;
-            while(med==st || med==ed){
-                med = rand()%(m_router->get_net_ptr()->getNumRouters());
-            }
-            t_flit->set_val_med(med);
-            t_flit->set_val_state(0);
+        int outport_to_go = m_router->get_net_ptr()->getSlimFlyOutport(my_id, dest_id);
+        if (getFreeVCCount(outport_to_go, vnet)>0 && getTotalCredits(outport_to_go, vnet)>0){
+            // go directly
         }else{
-            // do nothing
+            int p=rand()&1;
+            DPRINTF(RubyNetwork, "Router %d: VAL decision p=%d, for flit %s\n", my_id, p, *t_flit);
+            if(p){ 
+                // do nothing
+            }else{
+                // do VAL routing, randomly pick a medium router
+                int st = route.src_router, ed = route.dest_router;
+                int med = st;
+                while(med==st || med==ed){
+                    med = rand()%(m_router->get_net_ptr()->getNumRouters());
+                }
+                t_flit->set_val_med(med);
+                t_flit->set_val_state(0);
+            }
         }
-        // randomly pick a medium router
     }
     if (t_flit->get_val_state()==0){
         if(my_id==t_flit->get_val_med())
