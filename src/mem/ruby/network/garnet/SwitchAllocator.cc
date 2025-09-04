@@ -145,10 +145,13 @@ SwitchAllocator::arbitrate_inports()
                 // check if the flit in this InputVC is allowed to be sent
                 // send_allowed conditions described in that function.
                 // 这里决定了一定有 free 的 outvc，也得改这个函数
-                bool make_request =
-                    send_allowed(inport, invc, outport, outvc);
-
                 flit *t_flit = input_unit->peekTopFlit(invc);
+                
+
+                bool make_request =
+                    send_allowed(inport, invc, outport, outvc, t_flit);
+
+               
                 DPRINTF(RubyNetwork, "still in SA stage for flit: %s\n", *t_flit);
                 DPRINTF(RubyNetwork, "Send allowed for inport: %d, invc: %d, outport: %d, outvc: %d: %d\n",
                     inport, invc, outport, outvc, make_request);
@@ -205,16 +208,17 @@ SwitchAllocator::arbitrate_outports()
                 // grant this outport to this inport
                 int invc = m_vc_winners[inport];
                 // 最好不进入 outvc == -1 的分支? 但是提前决定有点难写
+                
+                // remove flit from Input VC
+                flit *t_flit = input_unit->getTopFlit(invc);
+
                 int outvc = input_unit->get_outvc(invc);
                 if (outvc == -1) {
                     // VC Allocation - select any free VC from outport
-                    outvc = vc_allocate(outport, inport, invc);
+                    outvc = vc_allocate(outport, inport, invc, t_flit);
                     DPRINTF(RubyNetwork, "VC allocated for outport: %d, inport: %d, invc: %d: %d\n",
                             outport, inport, invc, outvc);
                 }
-
-                // remove flit from Input VC
-                flit *t_flit = input_unit->getTopFlit(invc);
 
                 DPRINTF(RubyNetwork, "SwitchAllocator at Router %d "
                                      "granted outvc %d at outport %d "
@@ -325,31 +329,65 @@ SwitchAllocator::arbitrate_outports()
  *     that arrived before this flit and is requesting the same output port.
  */
 
+
+// [TODO]: merge with send_allowed()
 bool
-SwitchAllocator::send_allowed_ring(int inport, int invc, int outport, int outvc)
+SwitchAllocator::send_allowed(int inport, int invc, int outport, int outvc, flit *t_flit)
 {
     // Check if outvc needed
     // Check if credit needed (for multi-flit packet)
     // Check if ordering violated (in ordered vnet)
 
+    // int vnet = get_vnet(invc);
+    // bool has_outvc = (outvc != -1);
+    // bool has_credit = false;
+    // // invc 0,2,4..., need change, vc_layer=1
+    // // invc 1,3,5..., need change, vc_layer=0
+    // // int vc_layer = (invc&1)^(needs_vc_layer_transition_ring(inport, invc, outport, m_router, m_vc_per_vnet) ? 1 : 0);
+    // bool vc_layer = (invc&1)|(needs_vc_layer_transition_ring(inport, invc, outport, m_router, m_vc_per_vnet) ? 1 : 0);
+    // int vc_offset = 2;
+
     int vnet = get_vnet(invc);
     bool has_outvc = (outvc != -1);
     bool has_credit = false;
-    // invc 0,2,4..., need change, vc_layer=1
-    // invc 1,3,5..., need change, vc_layer=0
-    // int vc_layer = (invc&1)^(needs_vc_layer_transition_ring(inport, invc, outport, m_router, m_vc_per_vnet) ? 1 : 0);
-    bool vc_layer = (invc&1)|(needs_vc_layer_transition_ring(inport, invc, outport, m_router, m_vc_per_vnet) ? 1 : 0);
+
+
+    RoutingAlgorithm routing_algorithm =
+        (RoutingAlgorithm) m_router->get_net_ptr()->getRoutingAlgorithm();
+
+    bool use_val = m_router->get_net_ptr()->getVal();
+
+    int vc_layer = calculate_vclayer(inport, invc, outport, m_router, m_vc_per_vnet, routing_algorithm, t_flit);
+    DPRINTF(RubyNetwork, "Calculated vc_layer: %d for inport: %d, invc: %d, outport: %d, flit: %s\n",
+            vc_layer, inport, invc, outport, *t_flit);
     int vc_offset = 2;
+    if(routing_algorithm == RING_ || routing_algorithm == SLIMFLY_) {
+        vc_offset = 2;
+        if(use_val && (routing_algorithm == SLIMFLY_)) {
+            vc_offset = 4;
+        }
+    } else {
+        // assert(false);
+        vc_layer=0; 
+        vc_offset=1;
+    }
+    if(t_flit->get_route().dest_router == m_router->get_id()) {
+        // to avoid vc_layer overflow when reach destination
+        vc_layer=0; 
+        vc_offset=1;
+    }
+    assert(vc_offset <= m_vc_per_vnet);
+    assert(vc_layer < vc_offset);
 
     auto output_unit = m_router->getOutputUnit(outport);
     if (!has_outvc) {
 
         // needs outvc
         // this is only true for HEAD and HEAD_TAIL flits.
-        bool hasFreeVCRing = output_unit->has_free_vc_ring(vnet, vc_layer, vc_offset);
-        DPRINTF(RubyNetwork, "Checking free VC ring for vnet: %d, vc_layer: %d, vc_offset: %d: %d\n",
-                vnet, vc_layer, vc_offset, hasFreeVCRing);
-        if (hasFreeVCRing) {
+        bool hasFreeVCLayer = output_unit->has_free_vc_layer(vnet, vc_layer, vc_offset);
+        DPRINTF(RubyNetwork, "Checking free VC layer for vnet: %d, vc_layer: %d, vc_offset: %d: %d\n",
+                vnet, vc_layer, vc_offset, hasFreeVCLayer);
+        if (hasFreeVCLayer) {
 
             has_outvc = true;
 
@@ -390,147 +428,43 @@ SwitchAllocator::send_allowed_ring(int inport, int invc, int outport, int outvc)
 }
 
 
-bool
-SwitchAllocator::send_allowed(int inport, int invc, int outport, int outvc)
-{
-    // Check if outvc needed
-    // Check if credit needed (for multi-flit packet)
-    // Check if ordering violated (in ordered vnet)
-    RoutingAlgorithm routing_algorithm =
-        (RoutingAlgorithm) m_router->get_net_ptr()->getRoutingAlgorithm();
-
-    if (routing_algorithm == RING_) {
-        bool sendAllowedRing = send_allowed_ring(inport, invc, outport, outvc);
-        DPRINTF(RubyNetwork, "Send allowed (RING) for inport: %d, invc: %d, outport: %d, outvc: %d: %d\n",
-                inport, invc, outport, outvc, sendAllowedRing);
-        return sendAllowedRing;
-    }
-
-    int vnet = get_vnet(invc);
-    bool has_outvc = (outvc != -1);
-    bool has_credit = false;
-
-    auto output_unit = m_router->getOutputUnit(outport);
-    if (!has_outvc) {
-
-        // needs outvc
-        // this is only true for HEAD and HEAD_TAIL flits.
-
-        if (output_unit->has_free_vc(vnet)) {
-
-            has_outvc = true;
-
-            // each VC has at least one buffer,
-            // so no need for additional credit check
-            has_credit = true;
-        }
-    } else {
-        has_credit = output_unit->has_credit(outvc);
-    }
-
-    // cannot send if no outvc or no credit.
-    if (!has_outvc || !has_credit)
-        return false;
-
-
-    // protocol ordering check
-    if ((m_router->get_net_ptr())->isVNetOrdered(vnet)) {
-        auto input_unit = m_router->getInputUnit(inport);
-
-        // enqueue time of this flit
-        Tick t_enqueue_time = input_unit->get_enqueue_time(invc);
-
-        // check if any other flit is ready for SA and for same output port
-        // and was enqueued before this flit
-        int vc_base = vnet*m_vc_per_vnet;
-        for (int vc_offset = 0; vc_offset < m_vc_per_vnet; vc_offset++) {
-            int temp_vc = vc_base + vc_offset;
-            if (input_unit->need_stage(temp_vc, SA_, curTick())) {
-                int temp_outport;
-                // In wormhole mode, get outport from flit; in traditional mode, from VC
-                bool is_wormhole = false;
-                if (m_router->get_net_ptr() != nullptr) {
-                    is_wormhole = m_router->is_wormhole_enabled();
-                }
-                if (is_wormhole) {
-                    flit *temp_flit = input_unit->peekTopFlit(temp_vc);
-                    temp_outport = temp_flit->get_outport();
-                } else {
-                    temp_outport = input_unit->get_outport(temp_vc);
-                }
-
-                if ((temp_outport == outport) &&
-                   (input_unit->get_enqueue_time(temp_vc) < t_enqueue_time)) {
-                    return false;
-                }
-            }
-        }
-    }
-
-    return true;
-}
-
-// [DEBUG] well may this work ?
-bool
-SwitchAllocator::needs_vc_layer_transition_ring(int inport, int invc, int outport,
-                                          Router* router, int vc_per_vnet)
-{
-    // Check if this is router 0 (dateline) and packet came from left (router num_nodes-1)
-    int my_id = router->get_id();
-    return my_id == 0;
-}
-
-
-
-// Assign a free VC to the winner of the output port.
-int
-SwitchAllocator::vc_allocate(int outport, int inport, int invc)
-{
-    // Check if this is ring topology and needs special VC layer handling
-    RoutingAlgorithm routing_algorithm =
-        (RoutingAlgorithm) m_router->get_net_ptr()->getRoutingAlgorithm();
-
-    if (routing_algorithm == RING_) {
-        return vc_allocate_ring(outport, inport, invc);
-    }
-
-    // Standard VC allocation for other topologies
-    int outvc =
-        m_router->getOutputUnit(outport)->select_free_vc(get_vnet(invc));
-
-    // has to get a valid VC since it checked before performing SA
-    // [CHECK_THIS]  only original grant_outvc, hence can be calculate upward
-    assert(outvc != -1);
-
-    // In traditional mode, bind the input VC to output VC
-    // In wormhole mode, this binding is per-flit, not per-VC
-    bool is_wormhole = false;
-    if (m_router->get_net_ptr() != nullptr) {
-        is_wormhole = m_router->is_wormhole_enabled();
-    }
-    if (!is_wormhole) {
-        m_router->getInputUnit(inport)->grant_outvc(invc, outvc);
-    }
-
-    return outvc;
-}
 
 // [DEBUG] check this !
 
 // Enhanced VC allocation for ring topology with deadlock prevention
+// [TODO]: later, merge with vc_allocate()
 int
-SwitchAllocator::vc_allocate_ring(int outport, int inport, int invc)
+SwitchAllocator::vc_allocate(int outport, int inport, int invc, flit *t_flit)
 {
 
     int vnet = get_vnet(invc);
     bool has_credit = false;
-    // invc 0,2,4..., need change, vc_layer=1
-    // invc 1,3,5..., need change, vc_layer=1
-    // int vc_layer = (invc&1)^(needs_vc_layer_transition_ring(inport, invc, outport, m_router, m_vc_per_vnet) ? 1 : 0);
-    int vc_layer = (invc&1)|needs_vc_layer_transition_ring(inport, invc, outport, m_router, m_vc_per_vnet); // should also work ?
+    RoutingAlgorithm routing_algorithm =
+        (RoutingAlgorithm) m_router->get_net_ptr()->getRoutingAlgorithm();
+
+    bool use_val = m_router->get_net_ptr()->getVal();
+
+    int vc_layer = calculate_vclayer(inport, invc, outport, m_router, m_vc_per_vnet, routing_algorithm, t_flit);
+    
     int vc_offset = 2;
+    if(routing_algorithm == RING_ || routing_algorithm == SLIMFLY_) {
+        vc_offset = 2;
+        if(use_val && (routing_algorithm == SLIMFLY_)) {
+            vc_offset = 4;
+        }
+    } else {
+        vc_layer=0; 
+        vc_offset=1;
+    }
+    if(t_flit->get_route().dest_router == m_router->get_id()) {
+        // to avoid vc_layer overflow when reach destination
+        vc_layer=0; 
+        vc_offset=1;
+    }
+    assert(vc_offset <= m_vc_per_vnet);
+    assert(vc_layer < vc_offset);
     // Select VC from appropriate layer
-    int outvc = m_router->getOutputUnit(outport)->select_free_vc_ring(vnet, vc_layer, vc_offset);
+    int outvc = m_router->getOutputUnit(outport)->select_free_vc_layer(vnet, vc_layer, vc_offset);
 
     assert(outvc != -1);
 
@@ -538,6 +472,33 @@ SwitchAllocator::vc_allocate_ring(int outport, int inport, int invc)
 
     return outvc;
 }
+
+int SwitchAllocator::calculate_vclayer(int inport, int invc, int outport,
+                                        Router* router, int vc_per_vnet,
+                                        RoutingAlgorithm routing_algorithm,
+                                         flit *t_flit)
+{
+    // Check if this is router 0 (dateline) and packet came from left (router num_nodes-1)
+    int my_id = router->get_id();
+    int num_routers = router->get_net_ptr()->getNumRouters();
+    if (routing_algorithm == RING_) {
+        if(invc & 1) {
+            // invc is odd, vc_layer = 1
+            return 1;
+        } else {
+            if (my_id == 0 ) {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+    }else if(routing_algorithm == SLIMFLY_){
+        return t_flit->get_hops();
+    }else {
+        return 0;
+    }
+}
+
 
 
 // Wakeup the router next cycle to perform SA again

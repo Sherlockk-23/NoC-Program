@@ -37,6 +37,7 @@
 
 #include "mem/ruby/common/Consumer.hh"
 #include "mem/ruby/network/garnet/CommonTypes.hh"
+#include "mem/ruby/network/garnet/flit.hh"
 
 namespace gem5
 {
@@ -63,15 +64,14 @@ class SwitchAllocator : public Consumer
     void print(std::ostream& out) const {};
     void arbitrate_inports();
     void arbitrate_outports();
-    bool send_allowed(int inport, int invc, int outport, int outvc);
-    int vc_allocate(int outport, int inport, int invc);
+    bool send_allowed(int inport, int invc, int outport, int outvc, flit *t_flit);
+    int vc_allocate(int outport, int inport, int invc, flit *t_flit);
 
-    // Ring topology specific functions for deadlock prevention
-    int vc_allocate_ring(int outport, int inport, int invc);
-    bool send_allowed_ring(int inport, int invc, int outport, int outvc);
+    int calculate_vclayer(int inport, int invc, int outport,
+                                        Router* router, int vc_per_vnet,
+                                        RoutingAlgorithm routing_algorithm,
+                                         flit *t_flit);
 
-    bool needs_vc_layer_transition_ring(int inport, int invc, int outport,
-                                              Router* router, int vc_per_vnet);
     inline double
     get_input_arbiter_activity()
     {
