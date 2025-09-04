@@ -46,7 +46,7 @@ class GarnetNetwork(RubyNetwork):
     buffers_per_data_vc = Param.UInt32(4, "buffers per data virtual channel")
     buffers_per_ctrl_vc = Param.UInt32(1, "buffers per ctrl virtual channel")
     routing_algorithm = Param.Int(
-        0, "0: Weight-based Table, 1: XY, 2: Ring, 3: Custom"
+        0, "0: Weight-based Table, 1: XY, 2: Ring, 3: Custom, 4: SlimFly, 5: Wormhole, 6: Adaptive"
     )
     wormhole = Param.Int(1, "depth of wormhole flow control")
     # print("[DEBUG] worm hole is 4 here!") # not entering here, change here not working

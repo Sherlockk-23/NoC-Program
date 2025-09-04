@@ -35,6 +35,7 @@
 #include "base/compiler.hh"
 #include "debug/RubyNetwork.hh"
 #include "mem/ruby/network/garnet/InputUnit.hh"
+#include "mem/ruby/network/garnet/OutputUnit.hh"
 #include "mem/ruby/network/garnet/Router.hh"
 #include "mem/ruby/network/garnet/flit.hh"
 #include "mem/ruby/slicc_interface/Message.hh"
@@ -210,11 +211,19 @@ RoutingUnit::outportCompute(RouteInfo route, int inport,
             outportComputeRing(route, inport, inport_dirn); break;
         case BUTTERFLY_: outport =
             outportComputeButterfly(route, inport, inport_dirn); break;
-        case SLIMFLY_: outport =
-            outportComputeSlimFly(route, inport, inport_dirn); break;
+        case SLIMFLY_: 
+            if (use_val) {
+                outport = outportComputeSlimFly_VAL(route, inport, inport_dirn, t_flit);
+            } else {
+                outport = outportComputeSlimFly(route, inport, inport_dirn);
+            }
+            ; break;
         // any custom algorithm
         case CUSTOM_: outport =
             outportComputeCustom(route, inport, inport_dirn); break;
+        // adaptive routing with congestion awareness
+        case ADAPTIVE_: outport =
+            outportComputeAdaptive(route, inport, inport_dirn); break;
         default: outport =
             lookupRoutingTable(route.vnet, route.net_dest); break;
     }
@@ -483,6 +492,71 @@ RoutingUnit::outportComputeSlimFly(RouteInfo route,
     }
 }
 
+
+// 1. if the flit has val_state -1, and at src router: do step 2; o/w follow best outport
+// 2. get all possible outports (except inport and local port if not dest)
+// 3. get congestion metrics for each outport
+// 4. select best outport based on congestion metrics
+//          - if best outport is free, follow it (or, by possibility)
+//          - else do VAL routing: randomly pick a medium router (or one with free outport), set val_state to 0, set val_med to the picked router
+// 5. things for VAL routing
+
+
+int
+RoutingUnit::outportComputeSlimFly_VAL(RouteInfo route,
+                                  int inport,
+                                  PortDirection inport_dirn, 
+                                  flit *t_flit)
+{
+    int dest_id = route.dest_router;
+    int my_id = m_router->get_id();
+    if(t_flit->get_val_state()==-1 && my_id==route.src_router){
+        // p can be decided based on congestion metrics
+        int p=rand()&1;
+        DPRINTF(RubyNetwork, "Router %d: VAL decision p=%d, for flit %s\n", my_id, p, *t_flit);
+        if(p){ // do VAL routing
+            int st = route.src_router, ed = route.dest_router;
+            int med = st;
+            while(med==st || med==ed){
+                med = rand()%(m_router->get_net_ptr()->getNumRouters());
+            }
+            t_flit->set_val_med(med);
+            t_flit->set_val_state(0);
+        }else{
+            // do nothing
+        }
+        // randomly pick a medium router
+    }
+    if (t_flit->get_val_state()==0){
+        if(my_id==t_flit->get_val_med())
+            t_flit->set_val_state(1);
+        else
+            dest_id = t_flit->get_val_med();
+    }
+    if (t_flit->get_val_state()==1){
+        // do nothing
+    }
+    
+    // If destination is current router, route to local port
+    assert (my_id != dest_id) ;
+    
+    GarnetNetwork* network = m_router->get_net_ptr();
+    
+    // Use precomputed outport table for SlimFly routing
+    int target_outport = network->getSlimFlyOutport(my_id, dest_id);
+    
+    if (target_outport >= 0 && target_outport < m_router->get_num_outports()) {
+        DPRINTF(RubyNetwork, "Router %d: SlimFly routing to dest %d via outport %d\n", 
+                my_id, dest_id, target_outport);
+        return target_outport;
+    } else {
+        DPRINTF(RubyNetwork, "Router %d: Invalid outport %d for dest %d, using table fallback\n", 
+                my_id, target_outport, dest_id);
+        // Fallback to table-based routing
+        return lookupRoutingTable(route.vnet, route.net_dest);
+    }
+}
+
 // Template for implementing custom routing algorithm
 // using port directions. (Example adaptive)
 int
@@ -491,6 +565,206 @@ RoutingUnit::outportComputeCustom(RouteInfo route,
                                  PortDirection inport_dirn)
 {
     panic("%s placeholder executed", __FUNCTION__);
+}
+
+// Adaptive routing algorithm with congestion awareness
+// This is an example implementation that can be customized
+int
+RoutingUnit::outportComputeAdaptive(RouteInfo route,
+                                   int inport,
+                                   PortDirection inport_dirn)
+{
+    int my_id = m_router->get_id();
+    int dest_id = route.dest_router;
+    int vnet = route.vnet;
+    
+    DPRINTF(RubyNetwork, "Router %d: Adaptive routing to dest %d, vnet %d\n",
+            my_id, dest_id, vnet);
+    
+    // Get all possible output ports (exclude input port and local port for non-destination)
+    std::vector<int> candidate_outports;
+    
+    // For mesh topology, we can use both XY and YX routing
+    // First try to identify viable paths based on topology
+    
+    // Get mesh parameters if available
+    int num_rows = m_router->get_net_ptr()->getNumRows();
+    int num_cols = m_router->get_net_ptr()->getNumCols();
+    
+    if (num_rows > 0 && num_cols > 0) {
+        // Mesh topology - implement XY and YX adaptive routing
+        int my_x = my_id % num_cols;
+        int my_y = my_id / num_cols;
+        int dest_x = dest_id % num_cols;
+        int dest_y = dest_id / num_cols;
+        
+        // Add productive directions to candidate list
+        if (dest_x > my_x && m_outports_dirn2idx.count("East")) {
+            candidate_outports.push_back(m_outports_dirn2idx["East"]);
+        }
+        if (dest_x < my_x && m_outports_dirn2idx.count("West")) {
+            candidate_outports.push_back(m_outports_dirn2idx["West"]);
+        }
+        if (dest_y > my_y && m_outports_dirn2idx.count("South")) {
+            candidate_outports.push_back(m_outports_dirn2idx["South"]);
+        }
+        if (dest_y < my_y && m_outports_dirn2idx.count("North")) {
+            candidate_outports.push_back(m_outports_dirn2idx["North"]);
+        }
+    } else {
+        // For other topologies, consider all non-local outports as candidates
+        for (int outport = 0; outport < m_router->get_num_outports(); outport++) {
+            PortDirection outdir = m_router->getOutportDirection(outport);
+            if (outdir != "Local") {
+                candidate_outports.push_back(outport);
+            }
+        }
+    }
+    
+    if (candidate_outports.empty()) {
+        // No candidates found, fallback to table routing
+        DPRINTF(RubyNetwork, "Router %d: No candidate outports, using table fallback\n", my_id);
+        return lookupRoutingTable(route.vnet, route.net_dest);
+    }
+    
+    // Evaluate congestion for each candidate outport
+    int best_outport = candidate_outports[0];
+    int max_free_vcs = getFreeVCCount(best_outport, vnet);
+    int max_credits = getTotalCredits(best_outport, vnet);
+    
+    DPRINTF(RubyNetwork, "Router %d: Evaluating %zu candidate outports\n", 
+            my_id, candidate_outports.size());
+    
+    for (int outport : candidate_outports) {
+        int free_vcs = getFreeVCCount(outport, vnet);
+        int total_credits = getTotalCredits(outport, vnet);
+        
+        DPRINTF(RubyNetwork, "Router %d: Outport %d - Free VCs: %d, Credits: %d\n",
+                my_id, outport, free_vcs, total_credits);
+        
+        // Selection criteria: prioritize free VCs, then total credits
+        bool is_better = false;
+        if (free_vcs > max_free_vcs) {
+            is_better = true;
+        } else if (free_vcs == max_free_vcs && total_credits > max_credits) {
+            is_better = true;
+        }
+        
+        if (is_better) {
+            best_outport = outport;
+            max_free_vcs = free_vcs;
+            max_credits = total_credits;
+        }
+    }
+    
+    DPRINTF(RubyNetwork, "Router %d: Selected outport %d (Free VCs: %d, Credits: %d)\n",
+            my_id, best_outport, max_free_vcs, max_credits);
+    
+    return best_outport;
+}
+
+// Get the number of free VCs for a specific outport and vnet
+int
+RoutingUnit::getFreeVCCount(int outport, int vnet)
+{
+    if (outport >= m_router->get_num_outports() || outport < 0) {
+        return 0;
+    }
+    
+    OutputUnit* output_unit = m_router->getOutputUnit(outport);
+    if (!output_unit) {
+        return 0;
+    }
+    
+    int free_vc_count = 0;
+    int vc_per_vnet = m_router->get_vc_per_vnet();
+    int vc_base = vnet * vc_per_vnet;
+    
+    for (int vc = vc_base; vc < vc_base + vc_per_vnet; vc++) {
+        if (output_unit->is_vc_idle(vc, curTick())) {
+            free_vc_count++;
+        }
+    }
+    
+    return free_vc_count;
+}
+
+// Get the total credits available for a specific outport and vnet
+int
+RoutingUnit::getTotalCredits(int outport, int vnet)
+{
+    if (outport >= m_router->get_num_outports() || outport < 0) {
+        return 0;
+    }
+    
+    OutputUnit* output_unit = m_router->getOutputUnit(outport);
+    if (!output_unit) {
+        return 0;
+    }
+    
+    int total_credits = 0;
+    int vc_per_vnet = m_router->get_vc_per_vnet();
+    int vc_base = vnet * vc_per_vnet;
+    
+    for (int vc = vc_base; vc < vc_base + vc_per_vnet; vc++) {
+        if (vc < output_unit->get_num_vcs()) {
+            total_credits += output_unit->get_credit_count(vc);
+        }
+    }
+    
+    return total_credits;
+}
+
+// Get outport utilization (simplified metric)
+double
+RoutingUnit::getOutportUtilization(int outport)
+{
+    if (outport >= m_router->get_num_outports() || outport < 0) {
+        return 1.0; // Assume fully utilized if invalid
+    }
+    
+    OutputUnit* output_unit = m_router->getOutputUnit(outport);
+    if (!output_unit) {
+        return 1.0;
+    }
+    
+    // Simple utilization metric: ratio of busy VCs to total VCs
+    int total_vcs = output_unit->get_num_vcs();
+    int busy_vcs = 0;
+    
+    for (int vc = 0; vc < total_vcs; vc++) {
+        if (!output_unit->is_vc_idle(vc, curTick())) {
+            busy_vcs++;
+        }
+    }
+    
+    return total_vcs > 0 ? (double)busy_vcs / total_vcs : 0.0;
+}
+
+// Get free VC counts for all outports for a specific vnet
+std::vector<int>
+RoutingUnit::getAllFreeVCCounts(int vnet)
+{
+    std::vector<int> free_vc_counts;
+    
+    for (int outport = 0; outport < m_router->get_num_outports(); outport++) {
+        free_vc_counts.push_back(getFreeVCCount(outport, vnet));
+    }
+    
+    return free_vc_counts;
+}
+
+// Get total credits for all outports for a specific vnet
+std::vector<int>
+RoutingUnit::getAllTotalCredits(int vnet)
+{
+    std::vector<int> total_credits;
+    
+    for (int outport = 0; outport < m_router->get_num_outports(); outport++) {
+        total_credits.push_back(getTotalCredits(outport, vnet));
+    }
+    
+    return total_credits;
 }
 
 } // namespace garnet

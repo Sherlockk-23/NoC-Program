@@ -68,18 +68,30 @@ class OutputUnit : public Consumer
     void increment_credit(int out_vc);
     bool has_credit(int out_vc);
     bool has_free_vc(int vnet);
-    bool has_free_vc_ring(int vnet, int vc_layer, int vc_offset);
-    int select_free_vc_ring(int vnet, int vc_layer, int vc_offset);
+    bool has_free_vc_layer(int vnet, int vc_layer, int vc_offset);
+    int select_free_vc_layer(int vnet, int vc_layer, int vc_offset);
 
 
     int select_free_vc(int vnet);
 
     inline PortDirection get_direction() { return m_direction; }
 
-    int
+    
+    // Get credit count for a specific VC
+    inline int
     get_credit_count(int vc)
     {
-        return outVcState[vc].get_credit_count();
+        if (vc < outVcState.size()) {
+            return outVcState[vc].get_credit_count();
+        }
+        return 0;
+    }
+
+    // Get total number of VCs
+    inline int
+    get_num_vcs()
+    {
+        return outVcState.size();
     }
 
     inline int
@@ -107,6 +119,7 @@ class OutputUnit : public Consumer
     {
         return m_vc_per_vnet;
     }
+
 
     bool functionalRead(Packet *pkt, WriteMask &mask);
     uint32_t functionalWrite(Packet *pkt);

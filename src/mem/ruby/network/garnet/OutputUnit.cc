@@ -122,8 +122,9 @@ OutputUnit::has_free_vc(int vnet)
 }
 
 bool
-OutputUnit::has_free_vc_ring(int vnet, int vc_layer, int vc_offset)
+OutputUnit::has_free_vc_layer(int vnet, int vc_layer, int vc_offset)
 {
+    assert(vc_layer < vc_offset);
     int vc_base = vnet*m_vc_per_vnet;
     for (int vc = vc_base + vc_layer;
         vc < vc_base + m_vc_per_vnet; vc += vc_offset) {
@@ -138,7 +139,7 @@ OutputUnit::has_free_vc_ring(int vnet, int vc_layer, int vc_offset)
 // [CHECK THIS]
 
 int
-OutputUnit::select_free_vc_ring(int vnet, int vc_layer, int vc_offset)
+OutputUnit::select_free_vc_layer(int vnet, int vc_layer, int vc_offset)
 {
     int vc_base = vnet*m_vc_per_vnet;
     for (int vc = vc_base + vc_layer;
