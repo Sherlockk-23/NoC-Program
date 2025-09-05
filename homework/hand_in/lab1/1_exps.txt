@@ -1,0 +1,85 @@
+1ps
+packets_injected = 5                       # Number of packets injected into the network (Count)
+packets_received = 2                       # Number of packets received by the network (Count)
+average_packet_queueing_latency = 1000                       # Average packet queueing latency (Tick)
+average_packet_network_latency = 3000                       # Average packet network latency (Tick)
+average_packet_latency = 4000                       # Average packet latency (network + queueing) (Tick)
+average_hops = 1.500000                       # Average number of hops per flit (Count)
+reception_rate = 0.000003
+
+5ps
+packets_injected = 31                       # Number of packets injected into the network (Count)
+packets_received = 26                       # Number of packets received by the network (Count)
+average_packet_queueing_latency = 200                       # Average packet queueing latency (Tick)
+average_packet_network_latency = 1296.153846                       # Average packet network latency (Tick)
+average_packet_latency = 1496.153846                       # Average packet latency (network + queueing) (Tick)
+average_hops = 4.961538                       # Average number of hops per flit (Count)
+reception_rate = 0.000041
+
+
+10ps
+packets_injected = 68                       # Number of packets injected into the network (Count)
+packets_received = 64                       # Number of packets received by the network (Count)
+average_packet_queueing_latency = 100                       # Average packet queueing latency (Tick)
+average_packet_network_latency = 669.531250                       # Average packet network latency (Tick)
+average_packet_latency = 769.531250                       # Average packet latency (network + queueing) (Tick)
+average_hops = 5.187500                       # Average number of hops per flit (Count)
+reception_rate = 0.000100
+
+50ps
+packets_injected = 300                       # Number of packets injected into the network (Count)
+packets_received = 295                       # Number of packets received by the network (Count)
+average_packet_queueing_latency = 20                       # Average packet queueing latency (Tick)
+average_packet_network_latency = 131.254237                       # Average packet network latency (Tick)
+average_packet_latency = 151.254237                       # Average packet latency (network + queueing) (Tick)
+average_hops = 5.050847                       # Average number of hops per flit (Count)
+reception_rate = 0.000461
+
+
+100ps
+packets_injected = 619                       # Number of packets injected into the network (Count)
+packets_received = 618                       # Number of packets received by the network (Count)
+average_packet_queueing_latency = 10                       # Average packet queueing latency (Tick)
+average_packet_network_latency = 67.467638                       # Average packet network latency (Tick)
+average_packet_latency = 77.467638                       # Average packet latency (network + queueing) (Tick)
+average_hops = 5.237864                       # Average number of hops per flit (Count)
+reception_rate = 0.000966
+
+10GHz
+packets_injected = 619                       # Number of packets injected into the network (Count)
+packets_received = 618                       # Number of packets received by the network (Count)
+average_packet_queueing_latency = 10                       # Average packet queueing latency (Tick)
+average_packet_network_latency = 67.467638                       # Average packet network latency (Tick)
+average_packet_latency = 77.467638                       # Average packet latency (network + queueing) (Tick)
+average_hops = 5.237864                       # Average number of hops per flit (Count)
+reception_rate = 0.000966
+
+
+5GHz
+packets_injected = 1242                       # Number of packets injected into the network (Count)
+packets_received = 1237                       # Number of packets received by the network (Count)
+average_packet_queueing_latency = 6                       # Average packet queueing latency (Tick)
+average_packet_network_latency = 40.738884                       # Average packet network latency (Tick)
+average_packet_latency = 46.738884                       # Average packet latency (network + queueing) (Tick)
+average_hops = 5.283751                       # Average number of hops per flit (Count)
+reception_rate = 0.001933
+
+
+2GHz
+packets_injected = 3165                       # Number of packets injected into the network (Count)
+packets_received = 3162                       # Number of packets received by the network (Count)
+average_packet_queueing_latency = 2                       # Average packet queueing latency (Tick)
+average_packet_network_latency = 13.557559                       # Average packet network latency (Tick)
+average_packet_latency = 15.557559                       # Average packet latency (network + queueing) (Tick)
+average_hops = 5.269450                       # Average number of hops per flit (Count)
+reception_rate = 0.004941
+
+
+1GHz
+packets_injected = 6296                       # Number of packets injected into the network (Count)
+packets_received = 6288                       # Number of packets received by the network (Count)
+average_packet_queueing_latency = 2                       # Average packet queueing latency (Tick)
+average_packet_network_latency = 13.557411                       # Average packet network latency (Tick)
+average_packet_latency = 15.557411                       # Average packet latency (network + queueing) (Tick)
+average_hops = 5.269084                       # Average number of hops per flit (Count)
+reception_rate = 0.009825
