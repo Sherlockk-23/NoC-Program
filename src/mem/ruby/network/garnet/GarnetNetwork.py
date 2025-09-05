@@ -46,7 +46,7 @@ class GarnetNetwork(RubyNetwork):
     buffers_per_data_vc = Param.UInt32(4, "buffers per data virtual channel")
     buffers_per_ctrl_vc = Param.UInt32(1, "buffers per ctrl virtual channel")
     routing_algorithm = Param.Int(
-        0, "0: Weight-based Table, 1: XY, 2: Ring, 3: Custom, 4: SlimFly, 5: Wormhole, 6: Adaptive"
+        0, "0: Weight-based Table, 1: XY, 2: Ring, 3: Butterfly, 4: SlimFly, 5: Custom, 6: Adaptive, 7: FatTree Adaptive, 8: FatTree"
     )
     wormhole = Param.Int(1, "depth of wormhole flow control")
     # print("[DEBUG] worm hole is 4 here!") # not entering here, change here not working
@@ -55,12 +55,16 @@ class GarnetNetwork(RubyNetwork):
     garnet_deadlock_threshold = Param.UInt32(
         50000, "network-level deadlock threshold"
     )
-    use_val = Param.Bool("use VAL for routing algorithm")
+    ada_type = Param.UInt32("use VAL for routing algorithm")
+    no_deadlock = Param.Bool(False, "enable no-deadlock routing mode")
     
     # Custom topology information parameters
     special_nodes = VectorParam.Int([], "List of special node IDs for custom routing")
     next_hop_table = VectorParam.Int([], "Flattened next-hop table for custom routing")
     custom_routing_info = VectorParam.Int([], "Additional custom routing information")
+    
+    # FatTree specific parameters
+    fattree_k = Param.Int(4, "FatTree parameter k (number of ports per switch)")
     
     # SlimFly specific parameters
     slimfly_q = Param.Int(5, "SlimFly parameter q")
@@ -85,8 +89,8 @@ class GarnetNetworkInterface(ClockedObject):
     garnet_deadlock_threshold = Param.UInt32(
         Parent.garnet_deadlock_threshold, "network-level deadlock threshold"
     )
-    use_val = Param.Bool(
-        Parent.use_val,
+    ada_type = Param.UInt32(
+        Parent.ada_type,
         "use VAL for routing algorithm"
         )
 

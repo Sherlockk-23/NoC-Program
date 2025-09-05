@@ -109,11 +109,17 @@ def define_options(parser):
             5: Custom (see garnet/RoutingUnit.cc""",
     )
     parser.add_argument(
-        "--use-val",
+        "--ada-type",
         action="store",
-        type=bool,
+        type=int,
+        default=0,
+        help="""type of adaptive routing algorithm."""
+    )
+    parser.add_argument(
+        "--no-deadlock",
+        action="store_true",
         default=False,
-        help="""Whether use VAL routing""",
+        help="""enable no-deadlock routing mode."""
     )
     parser.add_argument(
         "--network-fault-model",
@@ -144,6 +150,15 @@ def define_options(parser):
         help="""SlimFly topology parameter q (must be prime and (q-1)%%4==0).
             Determines the size of the SlimFly network.""",
     )
+    parser.add_argument(
+        "--fattree-k",
+        action="store",
+        type=int,
+        default=4,
+        help="""FatTree topology parameter k (must be prime and (k-1)%%4==0).
+            Determines the size of the FatTree  network.""",
+    )
+
 
 
 def create_network(options, ruby):
@@ -196,7 +211,8 @@ def init_network(options, network, InterfaceClass):
         network.routing_algorithm = options.routing_algorithm
         network.wormhole = options.wormhole
         network.garnet_deadlock_threshold = options.garnet_deadlock_threshold
-        network.use_val = options.use_val
+        network.ada_type = options.ada_type
+        network.no_deadlock = options.no_deadlock
 
         # Create Bridges and connect them to the corresponding links
         for intLink in network.int_links:

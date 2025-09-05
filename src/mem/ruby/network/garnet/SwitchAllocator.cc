@@ -355,19 +355,18 @@ SwitchAllocator::send_allowed(int inport, int invc, int outport, int outvc, flit
     RoutingAlgorithm routing_algorithm =
         (RoutingAlgorithm) m_router->get_net_ptr()->getRoutingAlgorithm();
 
-    bool use_val = m_router->get_net_ptr()->getVal();
-
+    int ada_type = m_router->get_net_ptr()->getVal();
+    bool no_deadlock = m_router->get_net_ptr()->getNoDeadlock();
     int vc_layer = calculate_vclayer(inport, invc, outport, m_router, m_vc_per_vnet, routing_algorithm, t_flit);
-    DPRINTF(RubyNetwork, "Calculated vc_layer: %d for inport: %d, invc: %d, outport: %d, flit: %s\n",
-            vc_layer, inport, invc, outport, *t_flit);
+    // DPRINTF(RubyNetwork, "Calculated vc_layer: %d for inport: %d, invc: %d, outport: %d, flit: %s\n",
+    //         vc_layer, inport, invc, outport, *t_flit);
     int vc_offset = 2;
-    if(routing_algorithm == RING_ || routing_algorithm == SLIMFLY_) {
+    if(no_deadlock && (routing_algorithm == RING_ || routing_algorithm == SLIMFLY_)) {
         vc_offset = 2;
-        if(use_val && (routing_algorithm == SLIMFLY_)) {
+        if(ada_type && (routing_algorithm == SLIMFLY_)) {
             vc_offset = 4;
         }
     } else {
-        // assert(false);
         vc_layer=0; 
         vc_offset=1;
     }
@@ -442,14 +441,14 @@ SwitchAllocator::vc_allocate(int outport, int inport, int invc, flit *t_flit)
     RoutingAlgorithm routing_algorithm =
         (RoutingAlgorithm) m_router->get_net_ptr()->getRoutingAlgorithm();
 
-    bool use_val = m_router->get_net_ptr()->getVal();
-
+    int ada_type = m_router->get_net_ptr()->getVal();
+    bool no_deadlock = m_router->get_net_ptr()->getNoDeadlock();
     int vc_layer = calculate_vclayer(inport, invc, outport, m_router, m_vc_per_vnet, routing_algorithm, t_flit);
     
     int vc_offset = 2;
-    if(routing_algorithm == RING_ || routing_algorithm == SLIMFLY_) {
+    if( no_deadlock && (routing_algorithm == RING_ || routing_algorithm == SLIMFLY_)) {
         vc_offset = 2;
-        if(use_val && (routing_algorithm == SLIMFLY_)) {
+        if(ada_type && (routing_algorithm == SLIMFLY_)) {
             vc_offset = 4;
         }
     } else {

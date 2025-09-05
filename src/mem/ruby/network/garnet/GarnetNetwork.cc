@@ -70,7 +70,8 @@ GarnetNetwork::GarnetNetwork(const Params &p)
     m_buffers_per_data_vc = p.buffers_per_data_vc;
     m_buffers_per_ctrl_vc = p.buffers_per_ctrl_vc;
     m_routing_algorithm = p.routing_algorithm;
-    m_use_val = p.use_val;
+    m_ada_type = p.ada_type;
+    m_no_deadlock = p.no_deadlock;
     m_wormhole = p.wormhole;
     m_next_packet_id = 0;
 
@@ -85,6 +86,9 @@ GarnetNetwork::GarnetNetwork(const Params &p)
     m_slimfly_X1 = p.slimfly_X1;
     m_slimfly_X2 = p.slimfly_X2;
     m_slimfly_outport_table = p.slimfly_outport_table;
+    
+    // Initialize FatTree specific information
+    m_fattree_k = p.fattree_k;
 
     // DPRINTF(WORMHOLE, "[DEBUG] m_wormhole %d\n", m_wormhole);
     // DPRINTF(WORMHOLE, "[DEBUG] m_routing_algorithm %d\n", m_routing_algorithm);

@@ -196,34 +196,30 @@ RoutingUnit::outportCompute(RouteInfo route, int inport,
     RoutingAlgorithm routing_algorithm =
         (RoutingAlgorithm) m_router->get_net_ptr()->getRoutingAlgorithm();
 
-    bool use_val =  m_router->get_net_ptr()->getVal();
+    int ada_type =  m_router->get_net_ptr()->getVal();
 
     switch (routing_algorithm) {
         case TABLE_:  outport =
             lookupRoutingTable(route.vnet, route.net_dest); break;
-        case XY_:   if (use_val) {
-            outport = outportComputeXY_VAL(route, inport, inport_dirn, t_flit);
-        } else {
-            outport = outportComputeXY(route, inport, inport_dirn);
-        }
+        case XY_: 
+            outport = outportComputeXY(route, inport, inport_dirn, t_flit);
             ; break;
         case RING_:   outport =
             outportComputeRing(route, inport, inport_dirn); break;
         case BUTTERFLY_: outport =
             outportComputeButterfly(route, inport, inport_dirn); break;
         case SLIMFLY_: 
-            if (use_val) {
-                outport = outportComputeSlimFly_VAL(route, inport, inport_dirn, t_flit);
-            } else {
-                outport = outportComputeSlimFly(route, inport, inport_dirn);
-            }
+            outport = outportComputeSlimFly(route, inport, inport_dirn, t_flit);
             ; break;
         // any custom algorithm
         case CUSTOM_: outport =
             outportComputeCustom(route, inport, inport_dirn); break;
-        // adaptive routing with congestion awareness
-        case ADAPTIVE_: outport =
-            outportComputeAdaptive(route, inport, inport_dirn); break;
+        // FatTree adaptive routing
+        case FATTREE_ADAPTIVE_: 
+            assert(false); // Not implemented yet
+        // FatTree deterministic routing
+        case FATTREE_: outport =
+            outportComputeFatTree(route, inport, inport_dirn); break;
         default: outport =
             lookupRoutingTable(route.vnet, route.net_dest); break;
     }
@@ -238,65 +234,11 @@ RoutingUnit::outportCompute(RouteInfo route, int inport,
 int
 RoutingUnit::outportComputeXY(RouteInfo route,
                               int inport,
-                              PortDirection inport_dirn)
-{
-    PortDirection outport_dirn = "Unknown";
-
-    [[maybe_unused]] int num_rows = m_router->get_net_ptr()->getNumRows();
-    int num_cols = m_router->get_net_ptr()->getNumCols();
-    assert(num_rows > 0 && num_cols > 0);
-
-    int my_id = m_router->get_id();
-    int my_x = my_id % num_cols;
-    int my_y = my_id / num_cols;
-
-    int dest_id = route.dest_router;
-    int dest_x = dest_id % num_cols;
-    int dest_y = dest_id / num_cols;
-
-    int x_hops = abs(dest_x - my_x);
-    int y_hops = abs(dest_y - my_y);
-
-    bool x_dirn = (dest_x >= my_x);
-    bool y_dirn = (dest_y >= my_y);
-
-    // already checked that in outportCompute() function
-    assert(!(x_hops == 0 && y_hops == 0));
-
-    if (x_hops > 0) {
-        if (x_dirn) {
-            assert(inport_dirn == "Local" || inport_dirn == "West");
-            outport_dirn = "East";
-        } else {
-            assert(inport_dirn == "Local" || inport_dirn == "East");
-            outport_dirn = "West";
-        }
-    } else if (y_hops > 0) {
-        if (y_dirn) {
-            // "Local" or "South" or "West" or "East"
-            assert(inport_dirn != "North");
-            outport_dirn = "North";
-        } else {
-            // "Local" or "North" or "West" or "East"
-            assert(inport_dirn != "South");
-            outport_dirn = "South";
-        }
-    } else {
-        // x_hops == 0 and y_hops == 0
-        // this is not possible
-        // already checked that in outportCompute() function
-        panic("x_hops == y_hops == 0");
-    }
-
-    return m_outports_dirn2idx[outport_dirn];
-}
-
-int
-RoutingUnit::outportComputeXY_VAL(RouteInfo route,
-                              int inport,
                               PortDirection inport_dirn,
                                 flit *t_flit)
 {
+
+    int ada_type =  m_router->get_net_ptr()->getVal();
     PortDirection outport_dirn = "Unknown";
 
     [[maybe_unused]] int num_rows = m_router->get_net_ptr()->getNumRows();
@@ -309,32 +251,31 @@ RoutingUnit::outportComputeXY_VAL(RouteInfo route,
 
     int dest_id = route.dest_router;
 
-
-    if(t_flit->get_val_state()==-1){
-        // randomly pick a medium router
-        int st = route.src_router, ed = route.dest_router;
-        int med = st;
-        while(med==st || med==ed){
-            med = rand()%(m_router->get_net_ptr()->getNumRouters());
+    if (ada_type==1){
+        // VAL routing
+        if(t_flit->get_val_state()==-1){
+            // randomly pick a medium router
+            int st = route.src_router, ed = route.dest_router;
+            int med = st;
+            while(med==st || med==ed){
+                med = rand()%(m_router->get_net_ptr()->getNumRouters());
+            }
+            t_flit->set_val_med(med);
+            t_flit->set_val_state(0);
         }
-        t_flit->set_val_med(med);
-        t_flit->set_val_state(0);
+        if (t_flit->get_val_state()==0){
+            if(m_router->get_id()==t_flit->get_val_med())
+                t_flit->set_val_state(1);
+            else
+                dest_id = t_flit->get_val_med();
+        }
+        if (t_flit->get_val_state()==1){
+            if(m_router->get_id()==t_flit->get_val_med())
+                inport_dirn = "Local";
+        }
     }
-    if (t_flit->get_val_state()==0){
-        if(m_router->get_id()==t_flit->get_val_med())
-            t_flit->set_val_state(1);
-        else
-            dest_id = t_flit->get_val_med();
-    }
-    if (t_flit->get_val_state()==1){
-        if(m_router->get_id()==t_flit->get_val_med())
-            inport_dirn = "Local";
-    }
-
     int dest_x = dest_id % num_cols;
     int dest_y = dest_id / num_cols;
-
-    
 
     int x_hops = abs(dest_x - my_x);
     int y_hops = abs(dest_y - my_y);
@@ -372,6 +313,7 @@ RoutingUnit::outportComputeXY_VAL(RouteInfo route,
 
     return m_outports_dirn2idx[outport_dirn];
 }
+
 
 // Deadlock-free Ring routing algorithm using Virtual Channel Layering
 // Uses two VC layers to prevent deadlock when packets wrap around the ring
@@ -465,86 +407,87 @@ RoutingUnit::outportComputeButterfly(RouteInfo route,
 int
 RoutingUnit::outportComputeSlimFly(RouteInfo route,
                                   int inport,
-                                  PortDirection inport_dirn)
-{
-    int my_id = m_router->get_id();
-    int dest_id = route.dest_router;
-    
-    // If destination is current router, route to local port
-    if (my_id == dest_id) {
-        return lookupRoutingTable(route.vnet, route.net_dest);
-    }
-    
-    GarnetNetwork* network = m_router->get_net_ptr();
-    
-    // Use precomputed outport table for SlimFly routing
-    int target_outport = network->getSlimFlyOutport(my_id, dest_id);
-    
-    if (target_outport >= 0 && target_outport < m_router->get_num_outports()) {
-        DPRINTF(RubyNetwork, "Router %d: SlimFly routing to dest %d via outport %d\n", 
-                my_id, dest_id, target_outport);
-        return target_outport;
-    } else {
-        DPRINTF(RubyNetwork, "Router %d: Invalid outport %d for dest %d, using table fallback\n", 
-                my_id, target_outport, dest_id);
-        // Fallback to table-based routing
-        return lookupRoutingTable(route.vnet, route.net_dest);
-    }
-}
-
-
-// 1. if the flit has val_state -1, and at src router: do step 2; o/w follow best outport
-// 2. get all possible outports (except inport and local port if not dest)
-// 3. get congestion metrics for each outport
-// 4. select best outport based on congestion metrics
-//          - if best outport is free, follow it (or, by possibility)
-//          - else do VAL routing: randomly pick a medium router (or one with free outport), set val_state to 0, set val_med to the picked router
-// 5. things for VAL routing
-
-
-int
-RoutingUnit::outportComputeSlimFly_VAL(RouteInfo route,
-                                  int inport,
                                   PortDirection inport_dirn, 
                                   flit *t_flit)
 {
-    int dest_id = route.dest_router;
     int my_id = m_router->get_id();
-    int vnet = route.vnet;
+    int dest_id = route.dest_router;
 
-    if(t_flit->get_val_state()==-1 && my_id==route.src_router){
-        int outport_to_go = m_router->get_net_ptr()->getSlimFlyOutport(my_id, dest_id);
-        if (getFreeVCCount(outport_to_go, vnet)>0 && getTotalCredits(outport_to_go, vnet)>0){
-            // go directly
-        }else{
-            int p=rand()&1;
-            DPRINTF(RubyNetwork, "Router %d: VAL decision p=%d, for flit %s\n", my_id, p, *t_flit);
-            if(p){ 
-                // do nothing
-            }else{
-                // do VAL routing, randomly pick a medium router
-                int st = route.src_router, ed = route.dest_router;
-                int med = st;
-                while(med==st || med==ed){
-                    med = rand()%(m_router->get_net_ptr()->getNumRouters());
-                }
-                t_flit->set_val_med(med);
-                t_flit->set_val_state(0);
+    int ada_type =  m_router->get_net_ptr()->getVal();
+    bool no_deadlock = m_router->get_net_ptr()->getNoDeadlock();
+    DPRINTF(RubyNetwork, "Router %d: SlimFly routing from src %d to dest %d, current val_state %d, ada_type is %d, no_dead_lock is %d\n", 
+            my_id, route.src_router, route.dest_router, t_flit->get_val_state(), ada_type, no_deadlock);
+    if (ada_type==1){
+        int vnet = route.vnet;
+        int radix = m_router->get_net_ptr()->getSlimFlyRadix();
+        int layer = calculate_vclayer_slimfly(m_router, t_flit);
+        int offset = 4;
+        if (!no_deadlock){
+            layer=0; offset=1;
+        }
+        if(t_flit->get_val_state()==-1 && my_id==route.src_router){
+            // do VAL routing, randomly pick a medium router
+            int st = route.src_router, ed = route.dest_router;
+            int med = st;
+            while(med==st || med==ed){
+                med = rand()%(m_router->get_net_ptr()->getNumRouters());
             }
+            t_flit->set_val_med(med);
+            t_flit->set_val_state(0);
+        }
+        if (t_flit->get_val_state()==0){
+            if(my_id==t_flit->get_val_med())
+                t_flit->set_val_state(1);
+            else
+                dest_id = t_flit->get_val_med();
+        }
+        if (t_flit->get_val_state()==1){
+            // do nothing
         }
     }
-    if (t_flit->get_val_state()==0){
-        if(my_id==t_flit->get_val_med())
-            t_flit->set_val_state(1);
-        else
-            dest_id = t_flit->get_val_med();
-    }
-    if (t_flit->get_val_state()==1){
-        // do nothing
+    else if(ada_type==2){
+        int vnet = route.vnet;
+        int radix = m_router->get_net_ptr()->getSlimFlyRadix();
+        int layer = calculate_vclayer_slimfly(m_router, t_flit);
+        int offset = 4;
+        if (!no_deadlock){
+            layer=0; offset=1;
+        }
+        if(t_flit->get_val_state()==-1 && my_id==route.src_router){
+            int outport_to_go = m_router->get_net_ptr()->getSlimFlyOutport(my_id, dest_id);
+            if (getFreeVCCount(outport_to_go, vnet, layer, offset)>0 && getTotalCredits(outport_to_go, vnet, layer, offset)>0){
+                // go directly
+                DPRINTF(RubyNetwork, "Router %d: SlimFly no congestion, direct go to dest %d via outport %d\n", 
+                    my_id, dest_id, outport_to_go);
+            }else{
+                DPRINTF(RubyNetwork, "Router %d: SlimFly exist congestion, do VAL for flit %s\n", my_id, *t_flit);
+                for (int attempt=m_router->get_num_outports()-radix; 
+                        attempt<m_router->get_num_outports(); attempt++){
+                    if(getFreeVCCount(attempt, vnet, layer, offset)>0 && getTotalCredits(attempt, vnet, layer, offset)>0){
+                        DPRINTF(RubyNetwork, "Router %d: SlimFly avoid congestion via outport %d\n", 
+                            my_id, attempt);
+                        t_flit->set_val_state(1); // avoid further adapting
+                        return attempt;
+                    }
+                }
+            }
+        }
+        if (t_flit->get_val_state()==0){
+            if(my_id==t_flit->get_val_med())
+                t_flit->set_val_state(1);
+            else
+                dest_id = t_flit->get_val_med();
+        }
+        if (t_flit->get_val_state()==1){
+            // do nothing
+        }
     }
     
     // If destination is current router, route to local port
-    assert (my_id != dest_id) ;
+    if (my_id == dest_id) {
+        assert(inport_dirn == "Local" || inport_dirn == "Unknown");
+        return m_outports_dirn2idx["Local"];
+    }
     
     GarnetNetwork* network = m_router->get_net_ptr();
     
@@ -562,6 +505,7 @@ RoutingUnit::outportComputeSlimFly_VAL(RouteInfo route,
         return lookupRoutingTable(route.vnet, route.net_dest);
     }
 }
+
 
 // Template for implementing custom routing algorithm
 // using port directions. (Example adaptive)
@@ -573,105 +517,20 @@ RoutingUnit::outportComputeCustom(RouteInfo route,
     panic("%s placeholder executed", __FUNCTION__);
 }
 
-// Adaptive routing algorithm with congestion awareness
-// This is an example implementation that can be customized
-int
-RoutingUnit::outportComputeAdaptive(RouteInfo route,
-                                   int inport,
-                                   PortDirection inport_dirn)
+
+
+int RoutingUnit::calculate_vclayer_slimfly(Router* router, flit *t_flit)
 {
-    int my_id = m_router->get_id();
-    int dest_id = route.dest_router;
-    int vnet = route.vnet;
-    
-    DPRINTF(RubyNetwork, "Router %d: Adaptive routing to dest %d, vnet %d\n",
-            my_id, dest_id, vnet);
-    
-    // Get all possible output ports (exclude input port and local port for non-destination)
-    std::vector<int> candidate_outports;
-    
-    // For mesh topology, we can use both XY and YX routing
-    // First try to identify viable paths based on topology
-    
-    // Get mesh parameters if available
-    int num_rows = m_router->get_net_ptr()->getNumRows();
-    int num_cols = m_router->get_net_ptr()->getNumCols();
-    
-    if (num_rows > 0 && num_cols > 0) {
-        // Mesh topology - implement XY and YX adaptive routing
-        int my_x = my_id % num_cols;
-        int my_y = my_id / num_cols;
-        int dest_x = dest_id % num_cols;
-        int dest_y = dest_id / num_cols;
-        
-        // Add productive directions to candidate list
-        if (dest_x > my_x && m_outports_dirn2idx.count("East")) {
-            candidate_outports.push_back(m_outports_dirn2idx["East"]);
-        }
-        if (dest_x < my_x && m_outports_dirn2idx.count("West")) {
-            candidate_outports.push_back(m_outports_dirn2idx["West"]);
-        }
-        if (dest_y > my_y && m_outports_dirn2idx.count("South")) {
-            candidate_outports.push_back(m_outports_dirn2idx["South"]);
-        }
-        if (dest_y < my_y && m_outports_dirn2idx.count("North")) {
-            candidate_outports.push_back(m_outports_dirn2idx["North"]);
-        }
-    } else {
-        // For other topologies, consider all non-local outports as candidates
-        for (int outport = 0; outport < m_router->get_num_outports(); outport++) {
-            PortDirection outdir = m_router->getOutportDirection(outport);
-            if (outdir != "Local") {
-                candidate_outports.push_back(outport);
-            }
-        }
-    }
-    
-    if (candidate_outports.empty()) {
-        // No candidates found, fallback to table routing
-        DPRINTF(RubyNetwork, "Router %d: No candidate outports, using table fallback\n", my_id);
-        return lookupRoutingTable(route.vnet, route.net_dest);
-    }
-    
-    // Evaluate congestion for each candidate outport
-    int best_outport = candidate_outports[0];
-    int max_free_vcs = getFreeVCCount(best_outport, vnet);
-    int max_credits = getTotalCredits(best_outport, vnet);
-    
-    DPRINTF(RubyNetwork, "Router %d: Evaluating %zu candidate outports\n", 
-            my_id, candidate_outports.size());
-    
-    for (int outport : candidate_outports) {
-        int free_vcs = getFreeVCCount(outport, vnet);
-        int total_credits = getTotalCredits(outport, vnet);
-        
-        DPRINTF(RubyNetwork, "Router %d: Outport %d - Free VCs: %d, Credits: %d\n",
-                my_id, outport, free_vcs, total_credits);
-        
-        // Selection criteria: prioritize free VCs, then total credits
-        bool is_better = false;
-        if (free_vcs > max_free_vcs) {
-            is_better = true;
-        } else if (free_vcs == max_free_vcs && total_credits > max_credits) {
-            is_better = true;
-        }
-        
-        if (is_better) {
-            best_outport = outport;
-            max_free_vcs = free_vcs;
-            max_credits = total_credits;
-        }
-    }
-    
-    DPRINTF(RubyNetwork, "Router %d: Selected outport %d (Free VCs: %d, Credits: %d)\n",
-            my_id, best_outport, max_free_vcs, max_credits);
-    
-    return best_outport;
+    // Check if this is router 0 (dateline) and packet came from left (router num_nodes-1)
+    int my_id = router->get_id();
+    int num_routers = router->get_net_ptr()->getNumRouters();
+    return t_flit->get_hops();
 }
+
 
 // Get the number of free VCs for a specific outport and vnet
 int
-RoutingUnit::getFreeVCCount(int outport, int vnet)
+RoutingUnit::getFreeVCCount(int outport, int vnet, int layer, int offset)
 {
     if (outport >= m_router->get_num_outports() || outport < 0) {
         return 0;
@@ -686,8 +545,8 @@ RoutingUnit::getFreeVCCount(int outport, int vnet)
     int vc_per_vnet = m_router->get_vc_per_vnet();
     int vc_base = vnet * vc_per_vnet;
     
-    for (int vc = vc_base; vc < vc_base + vc_per_vnet; vc++) {
-        if (output_unit->is_vc_idle(vc, curTick())) {
+    for (int vc = vc_base + layer; vc < vc_base + vc_per_vnet; vc+= offset) {
+        if (output_unit->is_vc_idle(vc, curTick()) && output_unit->get_credit_count(vc) > 0) {
             free_vc_count++;
         }
     }
@@ -697,7 +556,7 @@ RoutingUnit::getFreeVCCount(int outport, int vnet)
 
 // Get the total credits available for a specific outport and vnet
 int
-RoutingUnit::getTotalCredits(int outport, int vnet)
+RoutingUnit::getTotalCredits(int outport, int vnet, int layer, int offset)
 {
     if (outport >= m_router->get_num_outports() || outport < 0) {
         return 0;
@@ -712,7 +571,7 @@ RoutingUnit::getTotalCredits(int outport, int vnet)
     int vc_per_vnet = m_router->get_vc_per_vnet();
     int vc_base = vnet * vc_per_vnet;
     
-    for (int vc = vc_base; vc < vc_base + vc_per_vnet; vc++) {
+    for (int vc = vc_base + layer; vc < vc_base + vc_per_vnet; vc+= offset) {
         if (vc < output_unit->get_num_vcs()) {
             total_credits += output_unit->get_credit_count(vc);
         }
@@ -721,40 +580,16 @@ RoutingUnit::getTotalCredits(int outport, int vnet)
     return total_credits;
 }
 
-// Get outport utilization (simplified metric)
-double
-RoutingUnit::getOutportUtilization(int outport)
-{
-    if (outport >= m_router->get_num_outports() || outport < 0) {
-        return 1.0; // Assume fully utilized if invalid
-    }
-    
-    OutputUnit* output_unit = m_router->getOutputUnit(outport);
-    if (!output_unit) {
-        return 1.0;
-    }
-    
-    // Simple utilization metric: ratio of busy VCs to total VCs
-    int total_vcs = output_unit->get_num_vcs();
-    int busy_vcs = 0;
-    
-    for (int vc = 0; vc < total_vcs; vc++) {
-        if (!output_unit->is_vc_idle(vc, curTick())) {
-            busy_vcs++;
-        }
-    }
-    
-    return total_vcs > 0 ? (double)busy_vcs / total_vcs : 0.0;
-}
+
 
 // Get free VC counts for all outports for a specific vnet
 std::vector<int>
-RoutingUnit::getAllFreeVCCounts(int vnet)
+RoutingUnit::getAllFreeVCCounts(int vnet, int layer, int offset)
 {
     std::vector<int> free_vc_counts;
     
     for (int outport = 0; outport < m_router->get_num_outports(); outport++) {
-        free_vc_counts.push_back(getFreeVCCount(outport, vnet));
+        free_vc_counts.push_back(getFreeVCCount(outport, vnet, layer, offset));
     }
     
     return free_vc_counts;
@@ -762,15 +597,185 @@ RoutingUnit::getAllFreeVCCounts(int vnet)
 
 // Get total credits for all outports for a specific vnet
 std::vector<int>
-RoutingUnit::getAllTotalCredits(int vnet)
+RoutingUnit::getAllTotalCredits(int vnet, int layer, int offset)
 {
     std::vector<int> total_credits;
     
     for (int outport = 0; outport < m_router->get_num_outports(); outport++) {
-        total_credits.push_back(getTotalCredits(outport, vnet));
+        total_credits.push_back(getTotalCredits(outport, vnet, layer, offset));
     }
     
     return total_credits;
+}
+
+// Non-adaptive FatTree routing algorithm implementation
+// Uses deterministic up-down routing without congestion awareness
+int
+RoutingUnit::outportComputeFatTree(RouteInfo route,
+                                  int inport,
+                                  PortDirection inport_dirn)
+{
+    int my_id = m_router->get_id();
+    int dest_id = route.dest_router;
+    int vnet = route.vnet;
+
+    int ada_type =  m_router->get_net_ptr()->getVal();
+    
+    DPRINTF(RubyNetwork, "Router %d: FatTree adaptive routing to dest %d\n",
+            my_id, dest_id);
+    
+    // For FatTree topology, we need to determine:
+    // 1. Router type (edge, aggregation, core)
+    // 2. Current pod and destination pod
+    // 3. Whether to route up or down
+    
+    GarnetNetwork* network = m_router->get_net_ptr();
+    int k = network->getFatTreeK(); // FatTree parameter k
+    // Calculate FatTree parameters
+    int num_pods = k;
+    int edge_switches_per_pod = k / 2;
+    int aggr_switches_per_pod = k / 2; 
+    int hosts_per_edge = k / 2;
+    
+    int num_edge_switches = num_pods * edge_switches_per_pod;
+    int num_aggr_switches = num_pods * aggr_switches_per_pod;
+    
+    // Determine router type and position
+    bool is_edge = (my_id < num_edge_switches);
+    bool is_aggr = (my_id >= num_edge_switches && my_id < num_edge_switches + num_aggr_switches);
+    bool is_core = (my_id >= num_edge_switches + num_aggr_switches);
+    
+    if (is_edge) {
+        // Edge router: route up to aggregation routers in same pod
+        // Find all aggregation routers in the same pod
+        int my_pod = my_id / edge_switches_per_pod;
+        int aggr_start = num_edge_switches + my_pod * aggr_switches_per_pod;
+        int aggr_end = aggr_start + aggr_switches_per_pod;
+        
+        // Determine destination pod
+        int dest_pod;
+        if (dest_id < num_edge_switches) {
+            dest_pod = dest_id / edge_switches_per_pod;
+        } else {
+            // Destination is not an edge router - use table routing
+            return lookupRoutingTable(route.vnet, route.net_dest);
+        }
+        
+        // If destination is in same pod, route directly if possible
+        if (dest_pod == my_pod) {
+            // Try to find direct connection to destination edge router
+            // For now, use table-based routing for intra-pod communication
+            return lookupRoutingTable(route.vnet, route.net_dest);
+        }
+        
+        // Inter-pod communication: choose least congested aggregation router
+        std::vector<int> candidate_outports;
+        std::vector<int> congestion_metrics;
+        
+        for (int outport = 0; outport < m_router->get_num_outports(); outport++) {
+            PortDirection outport_dirn = m_outports_idx2dirn[outport];
+            if (outport_dirn == "Up") {
+                candidate_outports.push_back(outport);
+                // Use free VC count as congestion metric
+                int free_vcs = getFreeVCCount(outport, vnet, 0, 1);
+                congestion_metrics.push_back(free_vcs);
+            }
+        }
+        
+        // Select outport with maximum free VCs
+        if (!candidate_outports.empty()) {
+            int best_idx = 0;
+            if (ada_type){
+                 for (int i = 1; i < congestion_metrics.size(); i++) {
+                    if (congestion_metrics[i] > congestion_metrics[best_idx]) {
+                        best_idx = i;
+                    }
+                }
+            }
+            return candidate_outports[best_idx];
+        }
+        
+    } else if (is_aggr) {
+        // Aggregation router: route up to core or down to edge
+        int my_pod = (my_id - num_edge_switches) / aggr_switches_per_pod;
+        
+        // Determine destination pod
+        int dest_pod;
+        if (dest_id < num_edge_switches) {
+            dest_pod = dest_id / edge_switches_per_pod;
+        } else {
+            return lookupRoutingTable(route.vnet, route.net_dest);
+        }
+        
+        if (dest_pod == my_pod) {
+            // Route down to edge router in same pod
+            std::vector<int> candidate_outports;
+            for (int outport = 0; outport < m_router->get_num_outports(); outport++) {
+                PortDirection outport_dirn = m_outports_idx2dirn[outport];
+                if (outport_dirn == "Down") {
+                    candidate_outports.push_back(outport);
+                }
+            }
+            
+            if (!candidate_outports.empty()) {
+                // For simplicity, use first available down port
+                // Could be enhanced with load balancing
+                return candidate_outports[0];
+            }
+        } else {
+            // Route up to core routers for inter-pod communication
+            std::vector<int> candidate_outports;
+            for (int outport = 0; outport < m_router->get_num_outports(); outport++) {
+                PortDirection outport_dirn = m_outports_idx2dirn[outport];
+                if (outport_dirn == "Up") {
+                    candidate_outports.push_back(outport);
+                }
+            }
+            
+            if (!candidate_outports.empty()) {
+                // Simple load balancing: round-robin or random selection
+                // Just pick the first one (deterministic)
+                int selected = 0;
+                if(ada_type)
+                    selected = (my_id + dest_id) % candidate_outports.size();
+                return candidate_outports[selected];
+            }
+        }
+        
+    } else if (is_core) {
+        // Core router: route down to appropriate aggregation router
+        // Determine destination pod
+        int dest_pod;
+        if (dest_id < num_edge_switches) {
+            dest_pod = dest_id / edge_switches_per_pod;
+        } else {
+            return lookupRoutingTable(route.vnet, route.net_dest);
+        }
+        
+        // Find outport that leads to the destination pod
+        // This requires knowledge of core-to-aggregation connections
+        // For now, use simple pod-based selection
+        std::vector<int> candidate_outports;
+        for (int outport = 0; outport < m_router->get_num_outports(); outport++) {
+            PortDirection outport_dirn = m_outports_idx2dirn[outport];
+            if (outport_dirn == "Down") {
+                candidate_outports.push_back(outport);
+            }
+        }
+        
+        if (!candidate_outports.empty()) {
+            // Select outport based on destination pod
+            int selected = 0; // Just pick the first one (deterministic)
+            if (ada_type){
+                selected = dest_pod % candidate_outports.size();
+            }
+            return candidate_outports[selected];
+        }
+    }
+    
+    // Fallback to table-based routing
+    DPRINTF(RubyNetwork, "Router %d: FatTree routing fallback to table\n", my_id);
+    return lookupRoutingTable(route.vnet, route.net_dest);
 }
 
 } // namespace garnet

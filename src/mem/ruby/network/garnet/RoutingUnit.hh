@@ -76,11 +76,7 @@ class RoutingUnit
     // Routing for Mesh
     int outportComputeXY(RouteInfo route,
                          int inport,
-                         PortDirection inport_dirn);
-
-    int outportComputeXY_VAL(RouteInfo route,
-                             int inport,
-                             PortDirection inport_dirn, 
+                         PortDirection inport_dirn, 
                               flit *t_flit);
 
     // Routing for Ring topology (deadlock-free)
@@ -96,29 +92,28 @@ class RoutingUnit
     // Routing for SlimFly topology
     int outportComputeSlimFly(RouteInfo route,
                              int inport,
-                             PortDirection inport_dirn);
-
-    int outportComputeSlimFly_VAL(RouteInfo route,
-                             int inport,
                              PortDirection inport_dirn, 
-                              flit *t_flit);                         
+                              flit *t_flit);           
+                     
+
+    // Non-adaptive FatTree routing (deterministic up-down)
+    int outportComputeFatTree(RouteInfo route,
+                             int inport,
+                             PortDirection inport_dirn);
 
     // Custom Routing Algorithm using Port Directions
     int outportComputeCustom(RouteInfo route,
                              int inport,
                              PortDirection inport_dirn);
 
-    // Adaptive routing with congestion awareness
-    int outportComputeAdaptive(RouteInfo route,
-                              int inport,
-                              PortDirection inport_dirn);
-
     // Congestion information gathering methods
-    int getFreeVCCount(int outport, int vnet);
-    int getTotalCredits(int outport, int vnet);
-    double getOutportUtilization(int outport);
-    std::vector<int> getAllFreeVCCounts(int vnet);
-    std::vector<int> getAllTotalCredits(int vnet);
+    int getFreeVCCount(int outport, int vnet, int layer, int offset);
+    int getTotalCredits(int outport, int vnet, int layer, int offset);
+    std::vector<int> getAllFreeVCCounts(int vnet, int layer, int offset);
+    std::vector<int> getAllTotalCredits(int vnet, int layer, int offset);
+
+
+    int calculate_vclayer_slimfly(Router* router, flit *t_flit);
 
     // Returns true if vnet is present in the vector
     // of vnets or if the vector supports all vnets.

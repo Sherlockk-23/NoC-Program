@@ -81,7 +81,8 @@ class GarnetNetwork : public Network
     uint32_t getBuffersPerCtrlVC() { return m_buffers_per_ctrl_vc; }
     int getRoutingAlgorithm() const { return m_routing_algorithm; }
     int depthWormhole() const { return m_wormhole; }
-    bool getVal() const { return m_use_val; }
+    int getVal() const { return m_ada_type; }
+    bool getNoDeadlock() const { return m_no_deadlock; }
 
     // // Custom topology information accessors
     // bool isSpecialNode(int node_id) const;
@@ -96,9 +97,23 @@ class GarnetNetwork : public Network
     bool isInSlimFlyX1(int val) const;
     bool isInSlimFlyX2(int val) const;
     int getSlimFlyOutport(int src_router, int dest_router) const;
+    int getSlimFlyRadix() const { 
+        if (m_slimfly_q %4 ==1) {
+            return (3*m_slimfly_q - 1)/2;
+        }else if (m_slimfly_q %4 ==2) {
+            assert(false);
+        }else if (m_slimfly_q %4 ==3) {
+            return (3*m_slimfly_q + 1 )/2;
+        }else{ // m_slimfly_q %4 ==0
+            return (3*m_slimfly_q)/2;
+        }
+     }
     void setSlimFlyInfo(int q, const std::vector<int>& X1_binary, 
                        const std::vector<int>& X2_binary,
                        const std::vector<int>& outport_table);
+    
+    // FatTree specific accessors
+    int getFatTreeK() const { return m_fattree_k; }
 
     bool isFaultModelEnabled() const { return m_enable_fault_model; }
     FaultModel* fault_model;
@@ -186,7 +201,8 @@ class GarnetNetwork : public Network
     uint32_t m_buffers_per_data_vc;
     int m_routing_algorithm;
     int m_wormhole; // [DEBUG]
-    bool m_use_val;
+    int m_ada_type;
+    bool m_no_deadlock;
     bool m_enable_fault_model;
 
     // Statistical variables
@@ -247,6 +263,9 @@ class GarnetNetwork : public Network
     std::vector<int> m_slimfly_X1;           // X1 set as binary array (0/1 for each 0..q-1)
     std::vector<int> m_slimfly_X2;           // X2 set as binary array (0/1 for each 0..q-1)
     std::vector<int> m_slimfly_outport_table; // Outport lookup table [src_router*num_routers + dest_router]
+    
+    // FatTree specific information
+    int m_fattree_k;                         // FatTree parameter k (number of ports per switch)
 };
 
 inline std::ostream&
