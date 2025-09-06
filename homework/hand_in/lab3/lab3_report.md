@@ -262,17 +262,16 @@ See following code as some examples of modifications.
 ```
 ### Analysis
 
-I iterate $VCs$ and $depth$ from $1,2,4$, and compared them under different traffic patterns under different topologies.
 
-I did not choose $VC=16$ or $depth=16$ because they make no difference in performance in this setting.
+I choose $VC=16$ or $depth=16$ and compared them under different traffic patterns under MeshXY topo.
 
 The figure is like
 
-![](plots/task3_wormhole_neighbor_analysis.png)
-
-![](plots/task3_wormhole_shuffle_analysis.png)
+Tornado pattern:
 
 ![](plots/task3_wormhole_tornado_analysis.png)
+
+Uniform random pattern:
 
 ![](plots/task3_wormhole_uniform_random_analysis.png)
 
@@ -280,4 +279,4 @@ One can find:
 
 1. Both wormhole and VC can help decrease latency, and their effectiveness is almost the same.
 
-2. A slight difference can be observed between $wormhole=2$ and $VC=2$, because wormhole flow control observes FIFO for each VC, while all VCs are parallel to each other.
+2. A slight difference can be observed between $wormhole=16$ and $VC=16$, because wormhole flow control observes FIFO for each VC, while all VCs are parallel to each other.

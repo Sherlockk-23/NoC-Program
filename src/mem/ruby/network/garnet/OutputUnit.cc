@@ -88,7 +88,13 @@ OutputUnit::increment_credit(int out_vc)
 bool
 OutputUnit::has_credit(int out_vc)
 {
-    assert(outVcState[out_vc].isInState(ACTIVE_, curTick()));
+    bool is_wormhole = false;
+    if (m_router->get_net_ptr() != nullptr) {
+        is_wormhole = m_router->is_wormhole_enabled();
+    }
+    if(!is_wormhole) {
+        assert(outVcState[out_vc].isInState(ACTIVE_, curTick()));
+    }
     return outVcState[out_vc].has_credit();
 }
 

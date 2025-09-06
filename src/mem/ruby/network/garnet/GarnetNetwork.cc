@@ -73,6 +73,9 @@ GarnetNetwork::GarnetNetwork(const Params &p)
     m_ada_type = p.ada_type;
     m_no_deadlock = p.no_deadlock;
     m_wormhole = p.wormhole;
+    m_buffers_per_data_vc = p.wormhole;
+    m_buffers_per_ctrl_vc = p.wormhole;
+
     m_next_packet_id = 0;
 
     // Initialize custom topology information
@@ -171,6 +174,8 @@ GarnetNetwork::init()
             router->printFaultVector(std::cout);
         }
     }
+    DPRINTF(RubyNetwork, "GarnetNetwork::init() complete, num of buffers per datavc %d, num of buffers per ctrlvc%d\n", 
+            m_buffers_per_data_vc, m_buffers_per_ctrl_vc);
     DPRINTF(RubyNetwork, "GarnetNetwork::init() complete, with number of routers %d, number of nodes %d \n",
             m_routers.size(), m_nodes);
 }
