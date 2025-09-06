@@ -117,15 +117,35 @@ For the adaptive routing, we applied $4$ virtual channels for the $4$ possible h
 
 ### 4.2 Slimfly min vs VAL vs adaptive
 
-- See avage hops to be aware of different patterns.
+See this figure, we compare the performance of the three routing algorithms under uniform random.
 
-- Since Slimfly is a densely connected, low-diameter network, it is difficult for it to be congested. Hence,  under most traffic patterns, congestion-aware adaptive routing cannot be activated often, and the performance is similar to minimal routing.
+![](./figures/slimfly_routing_comparison_uniform_random_vcs4.png)
 
-- However, under the single-destination traffic pattern,  when congestion occurs more frequently, the congestion-aware adaptive routing and VAL routing can outperform the minimal routing.
+One can see from the figure that:
+- They have obviously different average hops. For the minimal routing, the average hops lower than $2$. For the VAL routing, the average hops is around $4$. For the congestion-aware adaptive routing, the average hops increases slightly when congestion increases, but is still lower than $3$.
+- They have similar queueing latency, since the network dense, not easy to be congested under this traffic pattern.
+
+The following figure shows the performance under single-destination.
+
+![](./figures/slimfly_routing_comparison_single_dest_vcs4_high_inj.png)
+
+One can see from the figure that:
+
+- At this senario, the network is heavily congested. The congestion-aware adaptive routing has the lowest queueing latency, since it can adaptively avoid congested paths.
+
+- However, the VAL routing has the highest queueing latency, since it cannot avoid congested paths to the destination.
 
 
 
 ### 4.3 Fattree vs Slimfly
 
+See the following figure, we compare the performance of the two topologies under shuffle traffic pattern, both using $4$ VCs and different routing algorithms.
+
+![](figures/comprehensive_routing_comparison_shuffle_vcs4.png)
+
+One can find from the figure that:
+- The SlimFly topology has lower average hops than the FatTree topology, since it has a smaller diameter.
+- The SlimFly topology has lower queueing latency than the FatTree topology, since it has higher bisection bandwidth.
+- The FatTree topology has a sharper increase in queueing latency when the injection rate increases, since it has higher diameter.
 
 ## 5 Conclusion
