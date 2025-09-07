@@ -23,158 +23,159 @@ num_cpus=16
 num_dirs=16
 mesh_rows=4
 sim_cycles=100000
-injection_rates="0.01 0.02 0.05 0.1 0.15 0.2 0.25 0.3"
-traffic_patterns="uniform_random tornado neighbor shuffle"
+injection_rates="0.01 0.02 0.05 0.1 0.15 0.2 0.25 0.3 0.4"
+# traffic_patterns="uniform_random tornado neighbor shuffle"
+traffic_patterns="uniform_random tornado"
 all_traffic_patterns="uniform_random tornado transpose neighbor shuffle"
 
-# ==========================================
-# Task 1: Ring拓扑下不同流量模式分析
-# ==========================================
-echo ""
-echo "=== Task 1: Ring拓扑下不同流量模式分析 ==="
+# # ==========================================
+# # Task 1: Ring拓扑下不同流量模式分析
+# # ==========================================
+# echo ""
+# echo "=== Task 1: Ring拓扑下不同流量模式分析 ==="
 
-vcs_configs=(2 4)
+# vcs_configs=(2 4)
 
-for vcs in "${vcs_configs[@]}"; do
-    echo ""
-    echo "-- VCs per VNet: $vcs --"
+# for vcs in "${vcs_configs[@]}"; do
+#     echo ""
+#     echo "-- VCs per VNet: $vcs --"
 
-    # 创建结果文件
-    result_file="lab3_results/ring_traffic/data/ring_vcs${vcs}_results.txt"
-    echo "# traffic_pattern injection_rate packets_injected packets_received avg_packet_latency avg_queueing_latency avg_network_latency avg_hops reception_rate" > "$result_file"
+#     # 创建结果文件
+#     result_file="lab3_results/ring_traffic/data/ring_vcs${vcs}_results.txt"
+#     echo "# traffic_pattern injection_rate packets_injected packets_received avg_packet_latency avg_queueing_latency avg_network_latency avg_hops reception_rate" > "$result_file"
 
-    for pattern in $all_traffic_patterns; do
-        echo ""
-        echo "  测试流量模式: $pattern"
+#     for pattern in $all_traffic_patterns; do
+#         echo ""
+#         echo "  测试流量模式: $pattern"
 
-        for rate in $injection_rates; do
-            echo "    注入率: $rate"
+#         for rate in $injection_rates; do
+#             echo "    注入率: $rate"
 
-            # 运行仿真
-            ./build/NULL/gem5.opt \
-            configs/example/garnet_synth_traffic.py \
-            --network=garnet --num-cpus=$num_cpus \
-            --num-dirs=$num_dirs \
-            --topology=Ring \
-            --routing-algorithm=2 \
-            --vcs-per-vnet=$vcs \
-            --inj-vnet=0 --synthetic=$pattern \
-            --sim-cycles=$sim_cycles \
-            --garnet-deadlock-threshold=$sim_cycles \
-            --injectionrate=$rate \
-            --global-frequency=10GHz \
-            > lab3_results/ring_traffic/${pattern}_vcs${vcs}_${rate}.log 2>&1
+#             # 运行仿真
+#             ./build/NULL/gem5.opt \
+#             configs/example/garnet_synth_traffic.py \
+#             --network=garnet --num-cpus=$num_cpus \
+#             --num-dirs=$num_dirs \
+#             --topology=Ring \
+#             --routing-algorithm=2 \
+#             --vcs-per-vnet=$vcs \
+#             --inj-vnet=0 --synthetic=$pattern \
+#             --sim-cycles=$sim_cycles \
+#             --garnet-deadlock-threshold=$sim_cycles \
+#             --injectionrate=$rate \
+#             --global-frequency=10GHz \
+#             > lab3_results/ring_traffic/${pattern}_vcs${vcs}_${rate}.log 2>&1
 
-            # 检查仿真是否成功
-            if [ $? -eq 0 ]; then
-                # 提取统计数据
-                packets_injected=$(grep "packets_injected::total" m5out/stats.txt | awk '{print $2}')
-                packets_received=$(grep "packets_received::total" m5out/stats.txt | awk '{print $2}')
-                avg_packet_latency=$(grep "average_packet_latency" m5out/stats.txt | awk '{print $2}')
-                avg_queueing_latency=$(grep "average_packet_queueing_latency" m5out/stats.txt | awk '{print $2}')
-                avg_network_latency=$(grep "average_packet_network_latency" m5out/stats.txt | awk '{print $2}')
-                avg_hops=$(grep "average_hops" m5out/stats.txt | awk '{print $2}')
+#             # 检查仿真是否成功
+#             if [ $? -eq 0 ]; then
+#                 # 提取统计数据
+#                 packets_injected=$(grep "packets_injected::total" m5out/stats.txt | awk '{print $2}')
+#                 packets_received=$(grep "packets_received::total" m5out/stats.txt | awk '{print $2}')
+#                 avg_packet_latency=$(grep "average_packet_latency" m5out/stats.txt | awk '{print $2}')
+#                 avg_queueing_latency=$(grep "average_packet_queueing_latency" m5out/stats.txt | awk '{print $2}')
+#                 avg_network_latency=$(grep "average_packet_network_latency" m5out/stats.txt | awk '{print $2}')
+#                 avg_hops=$(grep "average_hops" m5out/stats.txt | awk '{print $2}')
 
-                # 计算接收率
-                if [ ! -z "$packets_received" ] && [ "$packets_received" != "0" ]; then
-                    reception_rate=$(awk "BEGIN {printf \"%.6f\", $packets_received / ($num_cpus * $sim_cycles)}")
+#                 # 计算接收率
+#                 if [ ! -z "$packets_received" ] && [ "$packets_received" != "0" ]; then
+#                     reception_rate=$(awk "BEGIN {printf \"%.6f\", $packets_received / ($num_cpus * $sim_cycles)}")
 
-                    echo "      ✓ 完成 - 延迟: $avg_packet_latency cycles"
+#                     echo "      ✓ 完成 - 延迟: $avg_packet_latency cycles"
 
-                    # 保存数据
-                    echo "$pattern $rate $packets_injected $packets_received $avg_packet_latency $avg_queueing_latency $avg_network_latency $avg_hops $reception_rate" >> "$result_file"
-                else
-                    echo "      ✗ 失败 - 无包接收"
-                fi
-            else
-                echo "      ✗ 仿真失败"
-            fi
-        done
-    done
-done
+#                     # 保存数据
+#                     echo "$pattern $rate $packets_injected $packets_received $avg_packet_latency $avg_queueing_latency $avg_network_latency $avg_hops $reception_rate" >> "$result_file"
+#                 else
+#                     echo "      ✗ 失败 - 无包接收"
+#                 fi
+#             else
+#                 echo "      ✗ 仿真失败"
+#             fi
+#         done
+#     done
+# done
 
-# ==========================================
-# Task 2: 不同拓扑和路由算法对比
-# ==========================================
-echo ""
-echo "=== Task 2: 不同拓扑和路由算法对比 ==="
+# # ==========================================
+# # Task 2: 不同拓扑和路由算法对比
+# # ==========================================
+# echo ""
+# echo "=== Task 2: 不同拓扑和路由算法对比 ==="
 
-# 拓扑配置
-topologies=(
-    "Mesh_XY 4 1 MeshXY"
-    "Pt2Pt 0 0 Pt2Pt"
-    "Crossbar 0 0 Crossbar"
-    "Ring 0 0 RingTable"
-    "Ring 0 2 RingAlgo"
-)
+# # 拓扑配置
+# topologies=(
+#     "Mesh_XY 4 1 MeshXY"
+#     "Pt2Pt 0 0 Pt2Pt"
+#     "Crossbar 0 0 Crossbar"
+#     "Ring 0 0 RingTable"
+#     "Ring 0 2 RingAlgo"
+# )
 
-for vcs in "${vcs_configs[@]}"; do
-    echo ""
-    echo "-- VCs per VNet: $vcs --"
+# for vcs in "${vcs_configs[@]}"; do
+#     echo ""
+#     echo "-- VCs per VNet: $vcs --"
 
-    # 创建结果文件
-    result_file="lab3_results/topology_comparison/data/topology_vcs${vcs}_results.txt"
-    echo "# topology_config traffic_pattern injection_rate packets_injected packets_received avg_packet_latency avg_queueing_latency avg_network_latency avg_hops reception_rate" > "$result_file"
+#     # 创建结果文件
+#     result_file="lab3_results/topology_comparison/data/topology_vcs${vcs}_results.txt"
+#     echo "# topology_config traffic_pattern injection_rate packets_injected packets_received avg_packet_latency avg_queueing_latency avg_network_latency avg_hops reception_rate" > "$result_file"
 
-    for topo_config in "${topologies[@]}"; do
-        read -r topology mesh_rows routing_algo config_name <<< "$topo_config"
+#     for topo_config in "${topologies[@]}"; do
+#         read -r topology mesh_rows routing_algo config_name <<< "$topo_config"
 
-        echo ""
-        echo "  测试拓扑: $config_name"
+#         echo ""
+#         echo "  测试拓扑: $config_name"
 
-        for pattern in $traffic_patterns; do
-            echo "    流量模式: $pattern"
+#         for pattern in $traffic_patterns; do
+#             echo "    流量模式: $pattern"
 
-            for rate in $injection_rates; do
-                echo "      注入率: $rate"
+#             for rate in $injection_rates; do
+#                 echo "      注入率: $rate"
 
-                # 构建命令
-                cmd="./build/NULL/gem5.opt configs/example/garnet_synth_traffic.py"
-                cmd+=" --network=garnet --num-cpus=$num_cpus --num-dirs=$num_dirs"
-                cmd+=" --topology=$topology"
+#                 # 构建命令
+#                 cmd="./build/NULL/gem5.opt configs/example/garnet_synth_traffic.py"
+#                 cmd+=" --network=garnet --num-cpus=$num_cpus --num-dirs=$num_dirs"
+#                 cmd+=" --topology=$topology"
 
-                if [ "$topology" == "Mesh_XY" ]; then
-                    cmd+=" --mesh-rows=$mesh_rows"
-                fi
+#                 if [ "$topology" == "Mesh_XY" ]; then
+#                     cmd+=" --mesh-rows=$mesh_rows"
+#                 fi
 
-                cmd+=" --routing-algorithm=$routing_algo"
-                cmd+=" --vcs-per-vnet=$vcs"
-                cmd+=" --inj-vnet=0 --synthetic=$pattern"
-                cmd+=" --sim-cycles=$sim_cycles --injectionrate=$rate"
-                cmd+=" --global-frequency=10GHz"
-                cmd+=" --garnet-deadlock-threshold=$sim_cycles"
+#                 cmd+=" --routing-algorithm=$routing_algo"
+#                 cmd+=" --vcs-per-vnet=$vcs"
+#                 cmd+=" --inj-vnet=0 --synthetic=$pattern"
+#                 cmd+=" --sim-cycles=$sim_cycles --injectionrate=$rate"
+#                 cmd+=" --global-frequency=10GHz"
+#                 cmd+=" --garnet-deadlock-threshold=$sim_cycles"
 
-                # 运行仿真
-                $cmd > lab3_results/topology_comparison/${config_name}_${pattern}_vcs${vcs}_${rate}.log 2>&1
+#                 # 运行仿真
+#                 $cmd > lab3_results/topology_comparison/${config_name}_${pattern}_vcs${vcs}_${rate}.log 2>&1
 
-                # 检查仿真是否成功
-                if [ $? -eq 0 ]; then
-                    # 提取统计数据
-                    packets_injected=$(grep "packets_injected::total" m5out/stats.txt | awk '{print $2}')
-                    packets_received=$(grep "packets_received::total" m5out/stats.txt | awk '{print $2}')
-                    avg_packet_latency=$(grep "average_packet_latency" m5out/stats.txt | awk '{print $2}')
-                    avg_queueing_latency=$(grep "average_packet_queueing_latency" m5out/stats.txt | awk '{print $2}')
-                    avg_network_latency=$(grep "average_packet_network_latency" m5out/stats.txt | awk '{print $2}')
-                    avg_hops=$(grep "average_hops" m5out/stats.txt | awk '{print $2}')
+#                 # 检查仿真是否成功
+#                 if [ $? -eq 0 ]; then
+#                     # 提取统计数据
+#                     packets_injected=$(grep "packets_injected::total" m5out/stats.txt | awk '{print $2}')
+#                     packets_received=$(grep "packets_received::total" m5out/stats.txt | awk '{print $2}')
+#                     avg_packet_latency=$(grep "average_packet_latency" m5out/stats.txt | awk '{print $2}')
+#                     avg_queueing_latency=$(grep "average_packet_queueing_latency" m5out/stats.txt | awk '{print $2}')
+#                     avg_network_latency=$(grep "average_packet_network_latency" m5out/stats.txt | awk '{print $2}')
+#                     avg_hops=$(grep "average_hops" m5out/stats.txt | awk '{print $2}')
 
-                    # 计算接收率
-                    if [ ! -z "$packets_received" ] && [ "$packets_received" != "0" ]; then
-                        reception_rate=$(awk "BEGIN {printf \"%.6f\", $packets_received / ($num_cpus * $sim_cycles)}")
+#                     # 计算接收率
+#                     if [ ! -z "$packets_received" ] && [ "$packets_received" != "0" ]; then
+#                         reception_rate=$(awk "BEGIN {printf \"%.6f\", $packets_received / ($num_cpus * $sim_cycles)}")
 
-                        echo "        ✓ 延迟: $avg_packet_latency cycles"
+#                         echo "        ✓ 延迟: $avg_packet_latency cycles"
 
-                        # 保存数据
-                        echo "$config_name $pattern $rate $packets_injected $packets_received $avg_packet_latency $avg_queueing_latency $avg_network_latency $avg_hops $reception_rate" >> "$result_file"
-                    else
-                        echo "        ✗ 无包接收"
-                    fi
-                else
-                    echo "        ✗ 仿真失败"
-                fi
-            done
-        done
-    done
-done
+#                         # 保存数据
+#                         echo "$config_name $pattern $rate $packets_injected $packets_received $avg_packet_latency $avg_queueing_latency $avg_network_latency $avg_hops $reception_rate" >> "$result_file"
+#                     else
+#                         echo "        ✗ 无包接收"
+#                     fi
+#                 else
+#                     echo "        ✗ 仿真失败"
+#                 fi
+#             done
+#         done
+#     done
+# done
 
 # ==========================================
 # Task 3: Wormhole流控制分析
@@ -185,16 +186,15 @@ echo "=== Task 3: Wormhole流控制分析 ==="
 # Wormhole配置
 wormhole_configs=(
     "1 1 VC1_1depth"
-    "1 2 VC1_2depth"
-    "2 1 VC2_1depth"
-    "2 2 VC2_2depth"
+    "1 16 VC1_16depth"
+    "16 1 VC16_1depth"
 )
 
 # Wormhole兼容拓扑（排除Ring）
 wormhole_topologies=(
     "Mesh_XY 4 1 MeshXY"
-    "Pt2Pt 0 0 Pt2Pt"
-    "Crossbar 0 0 Crossbar"
+    # "Pt2Pt 0 0 Pt2Pt"
+    # "Crossbar 0 0 Crossbar"
 )
 
 

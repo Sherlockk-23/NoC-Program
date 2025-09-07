@@ -6,13 +6,13 @@
     --network=garnet --num-cpus=16 \
     --num-dirs=16 \
     --topology=SlimFly  --routing-algorithm=4 \
-    --ada-type=1 \
+    --ada-type=0 \
     --no-deadlock \
     --vcs-per-vnet=4 \
     --inj-vnet=1 --synthetic=tornado \
     --single-dest-id=9 \
-    --sim-cycles=1000 \
-    --injectionrate=1 \
+    --sim-cycles=50000 \
+    --injectionrate=0.15 \
     --global-frequency=10GHz \
     > debug.txt
 

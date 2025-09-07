@@ -4,15 +4,15 @@
     --debug-flags=RubyNetwork \
     configs/example/garnet_synth_traffic.py \
     --network=garnet --num-cpus=16 \
-    --num-dirs=32 \
+    --num-dirs=16 \
     --topology=Mesh_XY  --routing-algorithm=1 --mesh-rows=4 \
     --ada-type=1 \
     --no-deadlock \
-    --vcs-per-vnet=2 \
+    --vcs-per-vnet=16 \
     --wormhole=1 \
-    --inj-vnet=0 --synthetic=uniform_random \
+    --inj-vnet=0 --synthetic=tornado \
     --sim-cycles=10000 \
-    --injectionrate=0.2 \
+    --injectionrate=0.5 \
     --global-frequency=10GHz \
     > debug.txt
 

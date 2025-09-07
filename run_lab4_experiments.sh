@@ -26,12 +26,12 @@ injection_rates="0.01 0.02 0.05 0.1 0.15 0.2 0.25 0.3 0.4 0.5 0.6 0.7 0.8"
 
 # 流量模式定义
 traffic_patterns=(
-    # "uniform_random"
-    # "tornado"
-    # "shuffle"
-    # "single_sender"     # --single-sender-id=3
+    "uniform_random"
+    "tornado"
+    "shuffle"
+    "single_sender"     # --single-sender-id=3
     "single_dest"    # --single-dest-id=9
-    # "single_pair"       # --single-sender-id=3 --single-dest-id=9
+    "single_pair"       # --single-sender-id=3 --single-dest-id=9
 )
 
 # ==========================================

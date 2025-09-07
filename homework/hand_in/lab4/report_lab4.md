@@ -144,8 +144,8 @@ See the following figure, we compare the performance of the two topologies under
 ![](figures/comprehensive_routing_comparison_shuffle_vcs4.png)
 
 One can find from the figure that:
-- The SlimFly topology has lower average hops than the FatTree topology, since it has a smaller diameter.
+- The SlimFly topology originally has lower average hops than the FatTree topology, since it has a smaller diameter. Later there is a hop drop in the FatTree topology, since it enters the saturated region and some packets are dropped.
 - The SlimFly topology has lower queueing latency than the FatTree topology, since it has higher bisection bandwidth.
-- The FatTree topology has a sharper increase in queueing latency when the injection rate increases, since it has higher diameter.
+- The FatTree topology has a much smaller saturation point than the SlimFly topology.
 
 ## 5 Conclusion
